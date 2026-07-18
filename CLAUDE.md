@@ -17,7 +17,7 @@ of scope for per-card stats).
 
 - `src/main.ts` — the ONLY file allowed to import "obsidian". Thin glue:
   lifecycle, events, commands, settings tab, and the `ReviewModal`/
-  `DeckPickerModal` classes (DOM wiring only — they delegate every state
+  `DecksView` classes (DOM wiring only — they delegate every state
   transition/count to `review.ts`/`decks.ts`). No parsing/scheduling/
   session logic here.
 - `src/parser.ts`, `src/scheduler.ts`, `src/reconcile.ts`, `src/review.ts`,
@@ -81,7 +81,7 @@ implement in the pure module. Only wire it into `main.ts` once tests are green.
 | Settings-triggered reindex | done | `main.ts` `FlowcardsSettingTab.hide()` → `saveSettings()` → `rebuildIndex()` |
 | Reverse-card due-date coordination | done | `types.ts` `Card.reverseOf`, `scheduler.ts` `coordinateSiblingDue` |
 | Per-callout deck-tag override | done | `parser.ts` `calloutCards()` — local `findDeckTags()` on the callout's own text |
-| Sidebar ribbon icon + deck-scoped review | done | `main.ts` `addRibbonIcon`/`DeckPickerModal`, `decks.ts` `buildDeckTree`/`filterByDeck` |
+| Deck overview page + deck-scoped review | done | `main.ts` `DecksView` (linkable via `obsidian://flowcards-decks`), `decks.ts` `buildDeckTree`/`filterByDeck` |
 | Configurable cloze pattern (custom regex) | open | `types.ts` `ClozeConfig` — highlight/bold toggle only, no pattern UI |
 | Bases note-aggregate export | open | not started |
 
@@ -106,13 +106,19 @@ ship before the ones they'd otherwise block.
   — see `FlowcardsSettingTab.hide()`), reverse-card due-date coordination
   (`Card.reverseOf` + `coordinateSiblingDue()`), per-callout deck-tag
   override. See Implementation status above.
-- **M5 (done): sidebar navigation & deck-scoped review.** Ribbon icon
-  (`addRibbonIcon`) opens "Review due cards" directly; "Browse decks to
-  review" command opens `DeckPickerModal`, showing a deck tree with due
-  counts (`decks.ts` `buildDeckTree`, dedupes multi-deck cards per node)
-  and an "All decks" shortcut. `startReview()` takes an optional
-  `deckPath`, filtered via `decks.ts` `filterByDeck()`. See Implementation
-  status above.
+- **M5 (done): deck overview page & deck-scoped review.** `DecksView`
+  (an `ItemView`, opened as a normal tab — not a Modal) lists every deck
+  hierarchically with due/total counts (`decks.ts` `buildDeckTree`,
+  dedupes multi-deck cards per node) and an "All decks" shortcut.
+  Reachable via the ribbon icon (`graduation-cap`), the "Open deck
+  overview" command, or a plain Markdown link from any note —
+  `[Decks](obsidian://flowcards-decks)`, registered via
+  `registerObsidianProtocolHandler` since Obsidian wikilinks can't target
+  a view without file backing. Picking a deck opens `ReviewModal` scoped
+  to it (`startReview()` takes an optional `deckPath`, filtered via
+  `decks.ts` `filterByDeck()`) and passes an `onClose` callback so the
+  page's counts refresh the instant the review Modal closes. See
+  Implementation status above.
 - **M6 (not started):** configurable cloze pattern UI (custom
   regex beyond the highlight/bold toggle), optional Bases note-aggregate
   export.
