@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseNote, extractDeck, extractClozes } from "../parser";
+import { parseNote, extractDeck, extractClozes, hasDeckTag } from "../parser";
 import { DEFAULT_SETTINGS } from "../types";
 
 const S = DEFAULT_SETTINGS;
@@ -17,6 +17,21 @@ describe("extractDeck", () => {
   it("reads from a frontmatter tag list", () => {
     const md = `---\ntags: [flashcards/os, other]\n---\nbody`;
     expect(extractDeck(md, S)).toBe("flashcards/os");
+  });
+});
+
+describe("hasDeckTag", () => {
+  it("true when an inline tag is present", () => {
+    expect(hasDeckTag("some text #flashcards/network more", S)).toBe(true);
+  });
+
+  it("true when a frontmatter tag list contains the root", () => {
+    const md = `---\ntags: [flashcards/os, other]\n---\nbody`;
+    expect(hasDeckTag(md, S)).toBe(true);
+  });
+
+  it("false when no tag matches the root anywhere", () => {
+    expect(hasDeckTag("no tags here, just prose", S)).toBe(false);
   });
 });
 
@@ -41,7 +56,7 @@ describe("parseNote — callouts", () => {
   });
 
   it("emits a second reversed card when the emoji is present", () => {
-    const md = `> [!card] Term 🔁\n> Definition`;
+    const md = `#flashcards\n\n> [!card] Term 🔁\n> Definition`;
     const cards = parseNote(md, "n.md", S);
     expect(cards).toHaveLength(2);
     expect(cards[1].reverse).toBe(true);
@@ -50,10 +65,15 @@ describe("parseNote — callouts", () => {
   });
 
   it("treats a callout body with clozes as cloze cards, not Q&A", () => {
-    const md = `> [!card] OSI 1\n> The ==physical== layer moves ==bits==`;
+    const md = `#flashcards\n\n> [!card] OSI 1\n> The ==physical== layer moves ==bits==`;
     const cards = parseNote(md, "n.md", S);
     expect(cards).toHaveLength(2);
     expect(cards.every((c) => c.kind === "cloze")).toBe(true);
+  });
+
+  it("a note without any deck tag produces zero cards, even with callouts and clozes", () => {
+    const md = `> [!card] Term 🔁\n> Definition\n\nThe ==physical== layer moves ==bits==.`;
+    expect(parseNote(md, "n.md", S)).toEqual([]);
   });
 });
 
@@ -68,7 +88,7 @@ describe("parseNote — inline clozes", () => {
   });
 
   it("uses the hint on the front when present", () => {
-    const md = `Brazilians speak ==Portuguese==^[language].`;
+    const md = `#flashcards\n\nBrazilians speak ==Portuguese==^[language].`;
     const cards = parseNote(md, "n.md", S);
     expect(cards[0].front).toContain("[language]");
   });

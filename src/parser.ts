@@ -22,12 +22,10 @@ function splitFrontmatter(md: string): { body: string; fm: string } {
   return { body: md.slice(m[0].length), fm: m[1] };
 }
 
-/**
- * Deck = the first tag under the configured root, full path preserved.
- * Looks in both frontmatter `tags:` and inline `#tags`. Subtag hierarchy
- * (tag/subtag) is preserved verbatim so the review layer can build the tree.
- */
-export function extractDeck(md: string, settings: FlowcardsSettings): string {
+/** Collect every tag under the configured root, from frontmatter `tags:` and
+ *  inline `#tags` alike. Shared by extractDeck() and hasDeckTag() so the two
+ *  never drift out of sync on what counts as "tagged". */
+function findDeckTags(md: string, settings: FlowcardsSettings): Set<string> {
   const root = settings.deckTagRoot;
   const tags = new Set<string>();
 
@@ -46,7 +44,29 @@ export function extractDeck(md: string, settings: FlowcardsSettings): string {
   const inline = body.matchAll(/(?:^|\s)#([\w/]+)/g);
   for (const m of inline) if (m[1].startsWith(root)) tags.add(m[1]);
 
-  return tags.size ? [...tags][0] : root;
+  return tags;
+}
+
+/**
+ * Deck = the first tag under the configured root, full path preserved.
+ * Looks in both frontmatter `tags:` and inline `#tags`. Subtag hierarchy
+ * (tag/subtag) is preserved verbatim so the review layer can build the tree.
+ */
+export function extractDeck(md: string, settings: FlowcardsSettings): string {
+  const tags = findDeckTags(md, settings);
+  return tags.size ? [...tags][0] : settings.deckTagRoot;
+}
+
+/**
+ * True iff the note carries the configured deck-tag-root anywhere
+ * (frontmatter tag list or inline #tag). Gates parseNote(): a note without
+ * this tag produces zero cards, regardless of callouts/clozes present — this
+ * is the actual opt-in that scopes Flowcards to notes the user marked for
+ * spaced repetition, rather than any note that happens to contain a
+ * highlight or a callout.
+ */
+export function hasDeckTag(md: string, settings: FlowcardsSettings): boolean {
+  return findDeckTags(md, settings).size > 0;
 }
 
 /** Find `==answer==` / `**answer**` clozes with optional ^[hint] and [^seq]. */
@@ -177,6 +197,7 @@ function calloutCards(c: Callout, deck: string, notePath: string, settings: Flow
 
 /** Top-level entry point. */
 export function parseNote(md: string, notePath: string, settings: FlowcardsSettings): Card[] {
+  if (!hasDeckTag(md, settings)) return [];
   const deck = extractDeck(md, settings);
   const { body } = splitFrontmatter(md);
   const cards: Card[] = [];
