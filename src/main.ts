@@ -156,14 +156,22 @@ export default class FlowcardsPlugin extends Plugin {
   }
 
   private async loadPersisted() {
-    const data = (await this.loadData()) as PersistedData | null;
-    if (data?.schema === 1) this.states = data.states;
-    // settings are stored alongside in a real build; kept default for the scaffold.
+    const data = (await this.loadData()) as Partial<PersistedData> | null;
+    if (data?.schema === 1) {
+      this.states = data.states ?? {};
+      this.settings = data.settings ?? DEFAULT_SETTINGS;
+    }
   }
 
   private async save() {
-    const data: PersistedData = { schema: 1, states: this.states };
+    const data: PersistedData = { schema: 1, states: this.states, settings: this.settings };
     await this.saveData(data);
+  }
+
+  /** Persist settings-tab edits. Public so FlowcardsSettingTab can call it
+   *  without exposing the general-purpose save() beyond this file. */
+  async saveSettings(): Promise<void> {
+    await this.save();
   }
 }
 
@@ -303,6 +311,7 @@ class FlowcardsSettingTab extends PluginSettingTab {
       .addText((t) =>
         t.setValue(this.plugin.settings.deckTagRoot).onChange(async (v) => {
           this.plugin.settings.deckTagRoot = v.trim();
+          await this.plugin.saveSettings();
         }),
       );
 
@@ -312,6 +321,7 @@ class FlowcardsSettingTab extends PluginSettingTab {
       .addText((t) =>
         t.setValue(this.plugin.settings.reverseEmoji).onChange(async (v) => {
           this.plugin.settings.reverseEmoji = v.trim();
+          await this.plugin.saveSettings();
         }),
       );
 
@@ -321,18 +331,21 @@ class FlowcardsSettingTab extends PluginSettingTab {
       .addText((t) =>
         t.setValue(this.plugin.settings.calloutType).onChange(async (v) => {
           this.plugin.settings.calloutType = v.trim();
+          await this.plugin.saveSettings();
         }),
       );
 
     new Setting(containerEl).setName("Cloze: highlight (==...==)").addToggle((tg) =>
-      tg.setValue(this.plugin.settings.cloze.highlight).onChange((v) => {
+      tg.setValue(this.plugin.settings.cloze.highlight).onChange(async (v) => {
         this.plugin.settings.cloze.highlight = v;
+        await this.plugin.saveSettings();
       }),
     );
 
     new Setting(containerEl).setName("Cloze: bold (**...**)").addToggle((tg) =>
-      tg.setValue(this.plugin.settings.cloze.bold).onChange((v) => {
+      tg.setValue(this.plugin.settings.cloze.bold).onChange(async (v) => {
         this.plugin.settings.cloze.bold = v;
+        await this.plugin.saveSettings();
       }),
     );
 
@@ -348,8 +361,9 @@ class FlowcardsSettingTab extends PluginSettingTab {
           .addOption("anywhere", "Whole note")
           .addOption("callout-only", "Inside callouts only")
           .setValue(this.plugin.settings.cloze.scope)
-          .onChange((v) => {
+          .onChange(async (v) => {
             this.plugin.settings.cloze.scope = v as ClozeScope;
+            await this.plugin.saveSettings();
           }),
       );
   }

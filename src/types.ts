@@ -62,6 +62,7 @@ export type StateMap = Record<string, CardState>;
 export interface PersistedData {
   schema: 1;
   states: StateMap;
+  settings: FlowcardsSettings;
 }
 
 /** Where cloze markers are recognized: everywhere in the note body, or only
