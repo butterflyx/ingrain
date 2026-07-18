@@ -5,17 +5,39 @@ import { isDue } from "./scheduler";
 // page (M5). No "obsidian" import — DecksView in main.ts is DOM-wiring
 // glue that delegates counting/filtering entirely to this module.
 
+/** Due-card counts by their most recent review rating. `new` covers cards
+ *  with an empty reviewLog (never reviewed). */
+export interface RatingBreakdown {
+  new: number;
+  again: number;
+  hard: number;
+  good: number;
+  easy: number;
+}
+
 export interface DeckNode {
   path: string; // full path, e.g. "flashcards/spanish/verbs"
   name: string; // last segment, e.g. "verbs"
   dueCount: number; // due cards in this deck or any subdeck
   totalCount: number; // ALL cards in this deck or any subdeck, due or not
+  dueByRating: RatingBreakdown; // breakdown of dueCount by last-rating category
   children: DeckNode[];
 }
 
 function addHash(map: Map<string, Set<string>>, path: string, hash: string) {
   if (!map.has(path)) map.set(path, new Set());
   map.get(path)!.add(hash);
+}
+
+/** A card's rating category, for the DecksView breakdown: its most recent
+ *  review rating, or "new" if it has never been reviewed. */
+function classify(state: CardState): keyof RatingBreakdown {
+  if (state.reviewLog.length === 0) return "new";
+  const last = state.reviewLog[state.reviewLog.length - 1].rating;
+  if (last === 1) return "again";
+  if (last === 2) return "hard";
+  if (last === 3) return "good";
+  return "easy";
 }
 
 /**
@@ -52,11 +74,15 @@ export function buildDeckTree(
   const nodes = new Map<string, DeckNode>();
   for (const [path, hashes] of totalByPath) {
     const segments = path.split("/");
+    const dueHashes = dueByPath.get(path);
+    const dueByRating: RatingBreakdown = { new: 0, again: 0, hard: 0, good: 0, easy: 0 };
+    for (const hash of dueHashes ?? []) dueByRating[classify(states[hash])]++;
     nodes.set(path, {
       path,
       name: segments[segments.length - 1],
-      dueCount: dueByPath.get(path)?.size ?? 0,
+      dueCount: dueHashes?.size ?? 0,
       totalCount: hashes.size,
+      dueByRating,
       children: [],
     });
   }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildDeckTree, filterByDeck } from "../decks";
-import { initialState } from "../scheduler";
-import { Card, StateMap } from "../types";
+import { initialState, schedule } from "../scheduler";
+import { Card, Rating, StateMap } from "../types";
 
 const now = new Date("2026-07-13T00:00:00Z");
 
@@ -21,11 +21,20 @@ function card(hash: string, decks: string[]): Card {
 }
 
 function dueState(hash: string) {
-  return initialState(hash, "n.md", now); // due immediately
+  return initialState(hash, "n.md", now); // due immediately, no reviewLog -> "new"
 }
 
 function notDueState(hash: string) {
   return { ...initialState(hash, "n.md", now), due: new Date("2099-01-01").toISOString() };
+}
+
+/** A due card that HAS been reviewed before, with `rating` as its most
+ *  recent review. schedule() always pushes `due` into the future, so it's
+ *  forced back to `now` here -- only the reviewLog entry (and thus the
+ *  rating classification) matters for these tests. */
+function ratedDueState(hash: string, rating: Rating) {
+  const scheduled = schedule(initialState(hash, "n.md", now), rating, now);
+  return { ...scheduled, due: now.toISOString() };
 }
 
 describe("buildDeckTree", () => {
@@ -96,6 +105,47 @@ describe("buildDeckTree", () => {
     };
     const tree = buildDeckTree(states, cardsByHash, now);
     expect(tree[0]).toMatchObject({ dueCount: 1, totalCount: 2 });
+  });
+
+  it("a due card with an empty reviewLog is classified as new", () => {
+    const states: StateMap = { a: dueState("a") };
+    const cardsByHash = { a: card("a", ["flashcards/spanish"]) };
+    const tree = buildDeckTree(states, cardsByHash, now);
+    expect(tree[0].dueByRating).toEqual({ new: 1, again: 0, hard: 0, good: 0, easy: 0 });
+  });
+
+  it("a due card's most recent rating determines its category", () => {
+    const states: StateMap = {
+      a: ratedDueState("a", 1),
+      b: ratedDueState("b", 2),
+      c: ratedDueState("c", 3),
+      d: ratedDueState("d", 4),
+    };
+    const cardsByHash = {
+      a: card("a", ["flashcards/x"]),
+      b: card("b", ["flashcards/x"]),
+      c: card("c", ["flashcards/x"]),
+      d: card("d", ["flashcards/x"]),
+    };
+    const tree = buildDeckTree(states, cardsByHash, now);
+    expect(tree[0].dueByRating).toEqual({ new: 0, again: 1, hard: 1, good: 1, easy: 1 });
+  });
+
+  it("a multi-deck card's rating is counted once at a shared ancestor", () => {
+    const states: StateMap = { a: ratedDueState("a", 4) };
+    const cardsByHash = { a: card("a", ["flashcards/a", "flashcards/b"]) };
+    const tree = buildDeckTree(states, cardsByHash, now);
+    expect(tree[0].dueByRating).toEqual({ new: 0, again: 0, hard: 0, good: 0, easy: 1 }); // root, deduped
+    const [nodeA, nodeB] = tree[0].children;
+    expect(nodeA.dueByRating.easy).toBe(1);
+    expect(nodeB.dueByRating.easy).toBe(1);
+  });
+
+  it("a not-due card is excluded from dueByRating even though it would be new", () => {
+    const states: StateMap = { a: notDueState("a") };
+    const cardsByHash = { a: card("a", ["flashcards/spanish"]) };
+    const tree = buildDeckTree(states, cardsByHash, now);
+    expect(tree[0].dueByRating).toEqual({ new: 0, again: 0, hard: 0, good: 0, easy: 0 });
   });
 });
 
