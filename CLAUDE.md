@@ -75,7 +75,7 @@ implement in the pure module. Only wire it into `main.ts` once tests are green.
 | Settings persistence | done | `main.ts` `PersistedData.settings`, `saveSettings()` |
 | Cloze seq-grouping (classic clozes, Generalized Overlapping) | done | `parser.ts` `groupClozes`/`extractClozes` — callout-only, `[^seq]` stays inert outside callouts to protect real footnotes |
 | Card context (nearest heading, filename fallback) | done | `parser.ts` `findHeadings`/`nearestHeading`, `types.ts` `Card.context` |
-| Cloze tables (inside callouts) | done | `parser.ts` — already worked via string-splicing, pinned down with tests, no fix needed |
+| Cloze tables | done | `parser.ts` `extractClozes`/`tableHeaderRanges` — string-splicing already preserved structure; real bug found later via dev-vault repro (bold/highlighted header rows were misread as clozes), now filtered out regardless of callout scope |
 | Multi-deck tags (`Card.decks`) | done | `types.ts` `Card.decks`, `parser.ts` `extractDecks` |
 | Settings-triggered reindex | done | `main.ts` `FlowcardsSettingTab.hide()` → `saveSettings()` → `rebuildIndex()` |
 | Reverse-card due-date coordination | done | `types.ts` `Card.reverseOf`, `scheduler.ts` `coordinateSiblingDue` |
@@ -137,3 +137,5 @@ Don't triage on your own initiative — wait to be asked, since priority
 here is the user's call, not yours.
 
 - Bilder cloze mittels Canvas in Obsidian umsetzen. Boardmittel wo immer möglich. (P:2)
+- Die Seite fürs lernen muss aus allen anderen Notizen verlinkbar sein, um mich zb in der Tagesnotiz an das lernen erinnern zu können (P:1)
+- eine Erinnerung Zeit-basiert und konfigurierbar, zb alle N Tage (P:2)
