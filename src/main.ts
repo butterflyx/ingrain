@@ -88,6 +88,8 @@ export default class FlowcardsPlugin extends Plugin {
 
     this.addSettingTab(new FlowcardsSettingTab(this.app, this));
 
+    this.addRibbonIcon("layers", "Review due cards", () => this.startReview());
+
     // Full sweep on load to purge states from deleted notes.
     this.app.workspace.onLayoutReady(() => void this.rebuildIndex());
   }
@@ -125,7 +127,7 @@ export default class FlowcardsPlugin extends Plugin {
     await this.save();
   }
 
-  private startReview() {
+  startReview() {
     const due = dueCards(this.states);
     if (!due.length) {
       new Notice("Flowcards: no cards due.");
