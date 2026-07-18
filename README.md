@@ -156,21 +156,17 @@ link:
 
 ## Current limitations
 
-Flowcards is early-stage. Known rough edges:
-
-- Settings changes don't survive an Obsidian restart yet.
-- Multiple clozes sharing the same reference number aren't grouped onto a
-  single card yet — each becomes its own card.
-- No sidebar icon yet; use the command palette to start a review.
+- Cloze recognition is highlight/bold only — no custom regex pattern, and
+  none is planned.
 - Reviewing an entire note at once is intentionally not supported — cards
   are always reviewed individually.
 
 ## Design notes
 
-- **Store only, no per-card frontmatter.** A note can hold several cards, so
-  there's no clean 1:1 mapping onto note-level frontmatter or Bases rows.
-  Per-card stats live in the plugin's own store instead; an optional
-  read-only note-aggregate for Bases may come later.
+- **Store only, no per-card frontmatter, no Bases integration.** A note
+  can hold several cards, so there's no clean 1:1 mapping onto note-level
+  frontmatter or Bases rows. Per-card stats live in the plugin's own
+  store instead — this is the permanent design, not a stopgap.
 - **Content-hash identity.** A card's hash is derived from its content, not
   its location — this is what makes renames/moves free and edits reset
   cleanly.

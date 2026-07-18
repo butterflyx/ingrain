@@ -82,8 +82,8 @@ implement in the pure module. Only wire it into `main.ts` once tests are green.
 | Reverse-card due-date coordination | done | `types.ts` `Card.reverseOf`, `scheduler.ts` `coordinateSiblingDue` |
 | Per-callout deck-tag override | done | `parser.ts` `calloutCards()` — local `findDeckTags()` on the callout's own text |
 | Deck overview page + deck-scoped review | done | `main.ts` `DecksView` (linkable via `obsidian://flowcards-decks`), `decks.ts` `buildDeckTree`/`filterByDeck` |
-| Configurable cloze pattern (custom regex) | open | `types.ts` `ClozeConfig` — highlight/bold toggle only, no pattern UI |
-| Bases note-aggregate export | open | not started |
+| Configurable cloze pattern (custom regex) | dropped | user doesn't need this — highlight/bold toggle stays the permanent design |
+| Bases note-aggregate export | dropped | user doesn't need this — store-only stays the permanent design |
 
 ## v1 milestones
 
@@ -119,11 +119,29 @@ ship before the ones they'd otherwise block.
   `decks.ts` `filterByDeck()`) and passes an `onClose` callback so the
   page's counts refresh the instant the review Modal closes. See
   Implementation status above.
-- **M6 (not started):** configurable cloze pattern UI (custom
-  regex beyond the highlight/bold toggle), optional Bases note-aggregate
-  export.
-- **M7 (not started): polish & convenience.** All `(P:3)` from the idea
-  backlog — lowest urgency, ship after everything above.
+- ~~M6: configurable cloze pattern UI, Bases export~~ — **dropped**, user
+  doesn't need this. See Implementation status above.
+- **M6 (not started): Canvas-based image clozes (P:2).** "Bilder cloze
+  mittels Canvas in Obsidian umsetzen. Boardmittel wo immer möglich."
+  Image-occlusion-style clozes (mark a region over an image, review shows
+  the image with that region blanked) using Obsidian's Canvas format.
+  Unresearched: `.canvas` files are JSON, a completely different track
+  from the Markdown string-parsing this plugin does today (`parser.ts`
+  doesn't apply at all) — needs investigation into the Canvas file format
+  and whatever rendering API Obsidian exposes before a real plan can be
+  written. "Boardmittel wo immer möglich" (prefer built-in means) points
+  toward reusing Canvas's native node/edge model rather than inventing a
+  new file format.
+- **M7 (not started): time-based review reminder (P:2).** "Eine
+  Erinnerung Zeit-basiert und konfigurierbar, zb alle N Tage." Needs a
+  design decision before implementing: a new `FlowcardsSettings` field
+  for the interval, a trigger mechanism (`Plugin.registerInterval()` for
+  an in-app timer is the obvious Obsidian-native option), and clarity on
+  what "every N days" means precisely (calendar-day interval? hours since
+  last review? only when cards are actually due?) — ask the user before
+  building this one.
+- **M8 (not started, was M7): polish & convenience.** All `(P:3)` from
+  the idea backlog — lowest urgency, ship after everything above.
   1. Default CSS icon for card callouts, so they're visually distinct in
      Reading/Live Preview without the user picking one manually.
   2. Translate the settings tab (and other UI strings) into other
@@ -144,6 +162,7 @@ milestone bullet (what changes, which files), and remove it from this list.
 Don't triage on your own initiative — wait to be asked, since priority
 here is the user's call, not yours.
 
-- Bilder cloze mittels Canvas in Obsidian umsetzen. Boardmittel wo immer möglich. (P:2)
-- Die Seite fürs lernen muss aus allen anderen Notizen verlinkbar sein, um mich zb in der Tagesnotiz an das lernen erinnern zu können (P:1)
-- eine Erinnerung Zeit-basiert und konfigurierbar, zb alle N Tage (P:2)
+- (none right now — Canvas image clozes and the time-based reminder went
+  into M6/M7 above; the P:1 "linkable learning page" idea turned out to
+  already be satisfied by the M5 DecksView work — `obsidian://flowcards-decks`
+  — so it wasn't triaged into a milestone, just dropped from this list)
