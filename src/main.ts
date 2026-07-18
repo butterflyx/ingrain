@@ -42,6 +42,7 @@ import {
 } from "./review";
 import { coordinateSiblingDue } from "./scheduler";
 import { DeckNode, RatingBreakdown, buildDeckTree, filterByDeck } from "./decks";
+import { shouldShowReminder } from "./reminder";
 
 // This is the ONLY file that touches the Obsidian API. It stays thin on
 // purpose: parse + reconcile + schedule + the review session state machine
@@ -140,6 +141,27 @@ export default class FlowcardsPlugin extends Plugin {
 
     // Full sweep on load to purge states from deleted notes.
     this.app.workspace.onLayoutReady(() => void this.rebuildIndex());
+
+    // Check once on load -- catches an interval that elapsed while
+    // Obsidian was closed, since the timer below only fires while it's
+    // running. Then re-check hourly; shouldShowReminder()'s own throttle
+    // keeps this from re-notifying more than once a day.
+    this.checkReminder();
+    this.registerInterval(window.setInterval(() => this.checkReminder(), 60 * 60 * 1000));
+  }
+
+  /** Shows a Notice, clickable to the deck overview, if shouldShowReminder()
+   *  says it's time (due cards exist, the configured interval has passed
+   *  since the last real review, and we haven't already reminded today). */
+  private checkReminder(): void {
+    if (!shouldShowReminder(this.states, this.settings.reminderIntervalDays, this.lastReminderShown)) {
+      return;
+    }
+    const due = dueCards(this.states).length;
+    const notice = new Notice(`Flowcards: ${due} card(s) due. Click to review.`, 10000);
+    notice.noticeEl.addEventListener("click", () => void this.activateDecksView());
+    this.lastReminderShown = new Date().toISOString();
+    void this.save();
   }
 
   /** Opens the deck overview in a normal tab, reusing one if already open. */

@@ -192,6 +192,7 @@ palette to force a full rescan.
 | Callout type | Only callouts of this type become cards (default `card`). Other callout types are left alone. |
 | Cloze: highlight / bold | Turn `==...==` and/or `**...**` recognition on or off independently. |
 | Cloze scope | **Whole note** (default): highlighted/bold text anywhere counts. **Inside callouts only**: loose highlights elsewhere in the note are ignored — callouts are unaffected either way. |
+| Review reminder | Show a Notice if you haven't reviewed in this many days (default `0`, disabled). Only fires when cards are actually due, and at most once a day even if you leave Obsidian open. Click the Notice to jump straight to the deck overview. |
 
 A **Danger zone** at the bottom has a "Reset everything" button that
 permanently deletes all scheduling history and starts every card fresh —
