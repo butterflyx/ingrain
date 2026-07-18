@@ -2,6 +2,7 @@ import {
   App,
   ButtonComponent,
   Component,
+  ItemView,
   MarkdownRenderer,
   Modal,
   Notice,
@@ -9,6 +10,7 @@ import {
   PluginSettingTab,
   Setting,
   TFile,
+  WorkspaceLeaf,
 } from "obsidian";
 import {
   Card,
@@ -43,7 +45,10 @@ import { DeckNode, buildDeckTree, filterByDeck } from "./decks";
 
 // This is the ONLY file that touches the Obsidian API. It stays thin on
 // purpose: parse + reconcile + schedule + the review session state machine
-// are all pure and tested elsewhere; ReviewModal below only wires DOM to it.
+// are all pure and tested elsewhere; ReviewModal/DecksView below only wire
+// DOM to it.
+
+const VIEW_TYPE_DECKS = "flowcards-decks-view";
 
 export default class FlowcardsPlugin extends Plugin {
   settings: FlowcardsSettings = DEFAULT_SETTINGS;
@@ -89,19 +94,38 @@ export default class FlowcardsPlugin extends Plugin {
 
     this.addCommand({
       id: "browse-decks",
-      name: "Browse decks to review",
-      callback: () => new DeckPickerModal(this.app, this).open(),
+      name: "Open deck overview",
+      callback: () => void this.activateDecksView(),
     });
 
     this.addSettingTab(new FlowcardsSettingTab(this.app, this));
 
-    this.addRibbonIcon("layers", "Review due cards", () => this.startReview());
+    this.registerView(VIEW_TYPE_DECKS, (leaf) => new DecksView(leaf, this));
+    // Lets a plain Markdown link -- [Decks](obsidian://flowcards-decks) --
+    // open the deck overview from any note (e.g. a daily note), since
+    // Obsidian wikilinks can only target real vault files, never a
+    // plugin view without file backing.
+    this.registerObsidianProtocolHandler("flowcards-decks", () => void this.activateDecksView());
+
+    this.addRibbonIcon("graduation-cap", "Open deck overview", () => void this.activateDecksView());
 
     // Full sweep on load to purge states from deleted notes.
     this.app.workspace.onLayoutReady(() => void this.rebuildIndex());
   }
 
+  /** Opens the deck overview in a normal tab, reusing one if already open. */
+  async activateDecksView(): Promise<void> {
+    const { workspace } = this.app;
+    let leaf = workspace.getLeavesOfType(VIEW_TYPE_DECKS)[0];
+    if (!leaf) {
+      leaf = workspace.getLeaf("tab");
+      await leaf.setViewState({ type: VIEW_TYPE_DECKS, active: true });
+    }
+    workspace.revealLeaf(leaf);
+  }
+
   onunload() {
+    this.app.workspace.detachLeavesOfType(VIEW_TYPE_DECKS);
     void this.save();
   }
 
@@ -134,7 +158,7 @@ export default class FlowcardsPlugin extends Plugin {
     await this.save();
   }
 
-  startReview(deckPath?: string) {
+  startReview(deckPath?: string, onClose?: () => void) {
     const due = filterByDeck(dueCards(this.states), this.cardCache, deckPath);
     if (!due.length) {
       new Notice(deckPath ? `Flowcards: no cards due in ${deckPath}.` : "Flowcards: no cards due.");
@@ -155,7 +179,7 @@ export default class FlowcardsPlugin extends Plugin {
       return;
     }
 
-    new ReviewModal(this.app, this, resolved, cardsByHash).open();
+    new ReviewModal(this.app, this, resolved, cardsByHash, onClose).open();
   }
 
   /** Persist the result of a single review. Write-through (not batched) so
@@ -212,6 +236,7 @@ class ReviewModal extends Modal {
     private plugin: FlowcardsPlugin,
     due: CardState[],
     cardsByHash: Map<string, Card>,
+    private onCloseCallback?: () => void,
   ) {
     super(app);
     this.session = startSession(due);
@@ -230,6 +255,9 @@ class ReviewModal extends Modal {
   onClose() {
     this.mdComponent.unload();
     this.contentEl.empty();
+    // Fires whether the session was completed or ended early (Esc/close
+    // button) -- e.g. lets DecksView refresh its due/total counts.
+    this.onCloseCallback?.();
   }
 
   private registerKeymap() {
@@ -321,50 +349,62 @@ class ReviewModal extends Modal {
 }
 
 /**
+ * A normal workspace tab (not a Modal) so it stays open and can be linked
+ * to from any note via obsidian://flowcards-decks (registered in onload()).
  * DOM-wiring glue only — counting and deck-tree structure come entirely
- * from decks.ts (buildDeckTree). Picking a node just calls
- * plugin.startReview(node.path), which itself delegates filtering to
- * decks.ts filterByDeck().
+ * from decks.ts (buildDeckTree). Picking a node calls
+ * plugin.startReview(node.path, onClose), passing this.render as the
+ * close-callback so the counts refresh the moment the review Modal closes,
+ * without needing to reopen or reload this view.
  */
-class DeckPickerModal extends Modal {
-  constructor(app: App, private plugin: FlowcardsPlugin) {
-    super(app);
+class DecksView extends ItemView {
+  constructor(leaf: WorkspaceLeaf, private plugin: FlowcardsPlugin) {
+    super(leaf);
   }
 
-  onOpen() {
+  getViewType(): string {
+    return VIEW_TYPE_DECKS;
+  }
+
+  getDisplayText(): string {
+    return "Flowcards decks";
+  }
+
+  getIcon(): string {
+    return "graduation-cap";
+  }
+
+  async onOpen() {
     this.render();
   }
 
-  private render() {
-    this.contentEl.empty();
-    this.titleEl.setText("Review a deck");
+  private render = () => {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h2", { text: "Decks" });
 
     const totalDue = dueCards(this.plugin.states).length;
-    new ButtonComponent(this.contentEl)
-      .setButtonText(`All decks (${totalDue})`)
+    new ButtonComponent(contentEl)
+      .setButtonText(`All decks (${totalDue} due)`)
       .setCta()
-      .onClick(() => {
-        this.close();
-        this.plugin.startReview();
-      });
+      .onClick(() => this.plugin.startReview(undefined, this.render));
 
     const tree = buildDeckTree(this.plugin.states, this.plugin.cardCache);
     if (!tree.length) {
-      this.contentEl.createEl("p", { text: "No due cards." });
+      contentEl.createEl("p", { text: "No cards indexed yet." });
       return;
     }
-    const list = this.contentEl.createDiv({ cls: "flowcards-deck-tree" });
+    const list = contentEl.createDiv({ cls: "flowcards-deck-tree" });
     this.renderNodes(list, tree, 0);
-  }
+  };
 
   private renderNodes(container: HTMLElement, nodes: DeckNode[], depth: number) {
     for (const node of nodes) {
       const row = container.createDiv({ cls: "flowcards-deck-row" });
       row.style.paddingLeft = `${depth * 1.25}em`;
-      new ButtonComponent(row).setButtonText(`${node.name} (${node.dueCount})`).onClick(() => {
-        this.close();
-        this.plugin.startReview(node.path);
-      });
+      new ButtonComponent(row)
+        .setButtonText(`${node.name} (${node.dueCount}/${node.totalCount})`)
+        .onClick(() => this.plugin.startReview(node.path, this.render));
       if (node.children.length) this.renderNodes(container, node.children, depth + 1);
     }
   }

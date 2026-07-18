@@ -117,9 +117,8 @@ single Q&A card — the title is ignored in that case:
 
 ## Reviewing
 
-Click the layers icon in the ribbon, or open the command palette and run
-**Review due cards**, to review everything that's due across your whole
-vault. For each card:
+Open the command palette and run **Review due cards** to review
+everything that's due across your whole vault right away. For each card:
 
 - Reveal the answer with the button, `Space`, or `Enter`.
 - Rate it **Again / Hard / Good / Easy** with the buttons or keys `1`–`4`.
@@ -128,12 +127,22 @@ vault. For each card:
 Scheduling follows SM-2 (the same algorithm Anki popularized): a card you
 rate "Again" comes back soon, "Easy" pushes it further out.
 
-### Reviewing a single deck
+### The deck overview
 
-Run **Browse decks to review** from the command palette to see every deck
-(and subdeck) with a due count, and start a review scoped to just one of
-them instead of everything. A card belonging to several deck tags shows
+Click the graduation-cap icon in the ribbon (or run **Open deck
+overview**) to open a page listing every deck and subdeck with its
+**due/total** card count. Click a deck to start a review scoped to just
+that one — the counts on the page update the moment you close the review
+window, no need to reopen it. A card belonging to several deck tags shows
 up under each of them, but — like always — is only ever reviewed once.
+
+The overview opens as a normal tab, so it stays around, and you can link
+to it from any other note (e.g. your daily note) with a plain Markdown
+link:
+
+```markdown
+[Review decks](obsidian://flowcards-decks)
+```
 
 ## Settings
 

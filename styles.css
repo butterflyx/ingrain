@@ -26,6 +26,7 @@
 
 .flowcards-deck-tree {
   margin-top: 1em;
+  max-width: 40em;
 }
 
 .flowcards-deck-row {
