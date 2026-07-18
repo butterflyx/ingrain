@@ -92,17 +92,32 @@ ship before the ones they'd otherwise block.
   (pure session state machine) + `ReviewModal` in `main.ts` (DOM glue).
 - **M4 (not started): cloze/review correctness follow-ups.** Triaged from
   the idea backlog, in `(P:N)` order.
-  1. **(P:1) Reliable cloze tables** — clozes inside Markdown tables should
+  1. **(P:1) Hide seq footnote markers from the card view — needs a design
+     call before implementing.** Dev-vault repro (`Biologie.md`): a
+     same-seq cloze sentence placed OUTSIDE a callout renders `[^1]` as
+     visible, dangling markup in the card ("...Wasserstoff[^1]-Atomen...")
+     because `allowSeq=false` there deliberately leaves it unconsumed (the
+     footnote-safety fix from M2 step 3). Two possible resolutions, pick
+     one with the user first: (a) working as designed — the real fix is
+     moving seq-clozes inside a `[!card]` callout, where they already
+     group and render cleanly; or (b) strip `[^N]`-shaped suffixes from
+     rendered front/back even outside callouts (cosmetic only, still no
+     cross-cloze grouping there), which risks reopening the exact
+     footnote-collision problem M2 step 3 was built to avoid — would need
+     a safer heuristic (e.g. only strip it if no `[^N]:` footnote
+     definition exists anywhere in the note) rather than a blanket strip.
+     `parser.ts` `extractClozes`/`clozeCards`.
+  2. **(P:1) Reliable cloze tables** — clozes inside Markdown tables should
      render correctly instead of risking broken table syntax. Unblocked
      now that M2 shipped cloze grouping. Scope the first pass to tables
      inside callouts only (`parser.ts` `clozeCards()`/`renderCloze()`);
      loose tables outside callouts can follow later.
-  2. **(P:2) Settings change triggers a reindex** — right now
+  3. **(P:2) Settings change triggers a reindex** — right now
      `saveSettings()` only persists; the user must manually run "Rebuild
      index" for e.g. a changed `calloutType` or `deckTagRoot` to take
      effect. Most users would expect this automatically (`main.ts`
      `saveSettings()` → call `rebuildIndex()`).
-  3. **(P:2) Reverse-card due-date coordination** — reviewing one side of a
+  4. **(P:2) Reverse-card due-date coordination** — reviewing one side of a
      reverse pair currently leaves the other side's `CardState` untouched,
      so it can still show up as due in the same/next session right after.
      Needs a way to push the sibling's `due` out when its pair is reviewed
