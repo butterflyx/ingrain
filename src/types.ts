@@ -83,6 +83,10 @@ export interface PersistedData {
   schema: 1;
   states: StateMap;
   settings: FlowcardsSettings;
+  /** ISO timestamp of the last time a review reminder was shown (see
+   *  reminder.ts). Optional for back-compat with data.json files saved
+   *  before this field existed. */
+  lastReminderShown?: string | null;
 }
 
 /** Where cloze markers are recognized: everywhere in the note body, or only
@@ -102,6 +106,9 @@ export interface FlowcardsSettings {
   reverseEmoji: string; // marks a card as reversible, e.g. "🔁"
   calloutType: string; // only callouts of this type (case-insensitive) become cards, e.g. "card"
   cloze: ClozeConfig;
+  /** Show a review reminder after this many days without a review, but only
+   *  when cards are actually due (see reminder.ts). 0 disables it. */
+  reminderIntervalDays: number;
 }
 
 export const DEFAULT_SETTINGS: FlowcardsSettings = {
@@ -109,4 +116,5 @@ export const DEFAULT_SETTINGS: FlowcardsSettings = {
   reverseEmoji: "🔁",
   calloutType: "card",
   cloze: { highlight: true, bold: true, scope: "anywhere" },
+  reminderIntervalDays: 0,
 };

@@ -58,6 +58,9 @@ export default class FlowcardsPlugin extends Plugin {
    *  so the review Modal can render front/back for due hashes, since
    *  CardState alone has no renderable content. */
   cardCache: Record<string, Card> = {};
+  /** ISO timestamp of the last time a review reminder was shown, or null.
+   *  See reminder.ts shouldShowReminder(). */
+  private lastReminderShown: string | null = null;
   /** Currently-open DecksView instances. Pushed a refresh directly from
    *  every state-changing operation below, since not all of them route
    *  through a workspace leaf-focus change that DecksView could otherwise
@@ -229,11 +232,17 @@ export default class FlowcardsPlugin extends Plugin {
     if (data?.schema === 1) {
       this.states = data.states ?? {};
       this.settings = data.settings ?? DEFAULT_SETTINGS;
+      this.lastReminderShown = data.lastReminderShown ?? null;
     }
   }
 
   private async save() {
-    const data: PersistedData = { schema: 1, states: this.states, settings: this.settings };
+    const data: PersistedData = {
+      schema: 1,
+      states: this.states,
+      settings: this.settings,
+      lastReminderShown: this.lastReminderShown,
+    };
     await this.saveData(data);
   }
 
@@ -583,6 +592,20 @@ class FlowcardsSettingTab extends PluginSettingTab {
             this.plugin.settings.cloze.scope = v as ClozeScope;
             this.dirty = true;
           }),
+      );
+
+    new Setting(containerEl)
+      .setName("Review reminder")
+      .setDesc(
+        "Show a reminder if you haven't reviewed in this many days (0 disables it). " +
+          "Only shown when cards are actually due.",
+      )
+      .addText((t) =>
+        t.setValue(String(this.plugin.settings.reminderIntervalDays)).onChange((v) => {
+          const n = parseInt(v, 10);
+          this.plugin.settings.reminderIntervalDays = Number.isFinite(n) && n >= 0 ? n : 0;
+          this.dirty = true;
+        }),
       );
 
     containerEl.createEl("h3", { text: "Danger zone" });
