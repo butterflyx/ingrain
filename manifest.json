@@ -1,0 +1,10 @@
+{
+  "id": "flowcards",
+  "name": "Flowcards",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Reading-flow-first spaced repetition: callouts and inline clozes as cards, hash-based identity, stats in a plugin store.",
+  "author": "butterflyx",
+  "authorUrl": "https://github.com/butterflyx",
+  "isDesktopOnly": false
+}
