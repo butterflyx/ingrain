@@ -16,10 +16,13 @@ of scope for per-card stats).
 ## Architecture — respect this boundary
 
 - `src/main.ts` — the ONLY file allowed to import "obsidian". Thin glue:
-  lifecycle, events, commands, settings tab. No parsing/scheduling logic here.
-- `src/parser.ts`, `src/scheduler.ts`, `src/reconcile.ts`, `src/hash.ts`,
-  `src/types.ts` — PURE. Never import "obsidian". This is where the real work
-  lives and where all tests point. You can iterate here fully headless.
+  lifecycle, events, commands, settings tab, and the `ReviewModal` class
+  (DOM wiring only — it delegates every state transition to `review.ts`).
+  No parsing/scheduling/session logic here.
+- `src/parser.ts`, `src/scheduler.ts`, `src/reconcile.ts`, `src/review.ts`,
+  `src/hash.ts`, `src/types.ts` — PURE. Never import "obsidian". This is where
+  the real work lives and where all tests point. You can iterate here fully
+  headless.
 
 When adding behaviour: write the vitest test in `src/__tests__/` first, then
 implement in the pure module. Only wire it into `main.ts` once tests are green.
@@ -33,29 +36,99 @@ implement in the pure module. Only wire it into `main.ts` once tests are green.
   intended behaviour, tested in `reconcile.test.ts`.
 - Identical cards colliding vault-wide is an accepted, ignored edge case.
 
+## Note-tag gating (do not break)
+
+- `parseNote()` returns `[]` entirely when `hasDeckTag()` is false — a note
+  without the configured deck tag (e.g. `#flashcards`) produces zero cards,
+  regardless of callouts/clozes present. This is the real opt-in.
+  `extractDeck()`'s fallback to the root deck name is display-only and must
+  never be read as "this note is tagged" — a note with a stray `==highlight==`
+  and no tag at all used to silently become reviewable; that's exactly the
+  bug this gate closes. Tested in `parser.test.ts` (`hasDeckTag` describe
+  block + the "no tag -> zero cards" case in `parseNote`).
+
 ## Things only the user can do (not you)
 
 - Reload the plugin in Obsidian (Cmd/Ctrl+R) after a build.
 - Inspect the live review UI. So keep logic in pure functions you CAN test.
+- If Node/npm aren't on PATH in your sandbox, check before assuming they're
+  unavailable — the user may have set up fnm/nvm since your last session.
 
 ## Reference
 
 - Obsidian API types: `node_modules/obsidian/obsidian.d.ts` (read this for API).
 - Behaviour reference (the plugin we're deliberately diverging from):
   `st3v3nmw/obsidian-spaced-repetition`.
+- User-facing feature docs and syntax examples: `README.md`.
 
-## v1 scope / roadmap (see README for the full checklist)
+## Implementation status
 
-- M1 (done here): parser subset + hash + SM-2 + reconcile, all tested.
-- M2: persist settings, richer parser (seq-grouped clozes, overlapping actions).
-- M3: the review Modal (mobile + desktop) — plugs in at `startReview()`.
-- M4: configurable cloze patterns UI, optional Bases note-aggregate export.
+| Feature | Status | Module |
+| --- | --- | --- |
+| Parser: callouts + inline clozes | done | `parser.ts` |
+| Note-tag gating | done | `parser.ts` `hasDeckTag` |
+| Cloze scope setting (whole note / callout-only) | done | `types.ts` `ClozeConfig.scope` |
+| SM-2 scheduler | done | `scheduler.ts` |
+| Reconcile (hash identity, rename/orphan handling) | done | `reconcile.ts` |
+| Review session state machine + Modal | done | `review.ts` + `main.ts` `ReviewModal` |
+| Settings persistence | open | `main.ts` `loadPersisted()`/`save()` only round-trips `states`, not `settings` — settings-tab edits are lost on reload |
+| Cloze seq-grouping (classic clozes, Generalized Overlapping) | open | `parser.ts` `clozeCards()` — sibling model only, marked TODO |
+| Configurable cloze pattern (custom regex) | open | `types.ts` `ClozeConfig` — highlight/bold toggle only, no pattern UI |
+| Bases note-aggregate export | open | not started |
+
+## v1 milestones
+
+Backlog ideas have been triaged into the milestones below, grouped by which
+part of the codebase they touch and ordered so smaller/independent pieces
+ship before the ones they'd otherwise block.
+
+- **M1 (done):** parser subset + hash + SM-2 + reconcile, all tested.
+- **M2 (in progress):** note-tag gating done, cloze-scope setting done.
+  Still open, in priority order:
+  1. **Configurable callout type** — a new setting for the callout type
+     that counts as a card (default `card`). `findCallouts()` currently
+     matches any `[!type]`, so a `[!warning]`/`[!note]`/etc. callout in a
+     tagged note becomes a Q&A card today; this scopes recognition down to
+     the configured type only, mirroring the note-tag gate one level
+     deeper (tag gates the *note*, this gates the *callout*).
+  2. **Persist settings** — `main.ts` `loadPersisted()`/`save()` only
+     round-trips `states`, not `settings`; settings-tab edits are lost on
+     reload. (Also where the new callout-type setting above needs to land
+     once this ships.)
+  3. **Cloze seq-grouping** — classic clozes sharing a `[^seq]` number
+     should collapse onto one card with Generalized-Overlapping-style
+     hiding, instead of today's independent sibling cards (`parser.ts`
+     `clozeCards()`, marked TODO).
+  4. **Card context** — attach the nearest heading above a card's source
+     block (fallback: the note's filename) so the review UI shows *where*
+     a card comes from, not just its deck. Touches `types.ts` (new `Card`
+     field), `parser.ts` (track the current heading while walking the note
+     body), `main.ts` `ReviewModal` (render it).
+- **M3 (done):** the review Modal (mobile + desktop) — `src/review.ts`
+  (pure session state machine) + `ReviewModal` in `main.ts` (DOM glue).
+- **M4 (not started): sidebar navigation & deck-scoped review.**
+  1. Ribbon icon that opens "Review due cards" directly — trivial, zero new
+     logic, ships first (`main.ts` `addRibbonIcon`).
+  2. An overview view/modal listing decks with due counts, so the user can
+     review one subdeck at a time instead of always reviewing everything —
+     needs `dueCards()`/`startReview()` to accept an optional deck-path
+     filter, plus a small pure helper to build a deck tree + counts from
+     the store.
+- **M5 (not started, was M4):** configurable cloze pattern UI (custom
+  regex beyond the highlight/bold toggle), optional Bases note-aggregate
+  export.
 - Explicitly NOT in v1: reviewing whole notes.
 
-## ideas for roadmap planning
+## Raw ideas (untriaged)
 
-- [ ] Schalter, mit dem festgelegt wird, ob cloze pattern nur innerhalb von
-  callouts gelten soll oder für die gesamte Notiz in den Einstellungen des plugins
-- [ ] cards should contain the headline of the paragraph where the card lives in the note, to give the student context. If there is no card, use the note name
-- [ ] icon für die sidebar um Karten zu lernen
-- [ ] icon in sidebar führt auf eine Übersichtsseite, auf der ich die subdecks zum lernen auswählen kann, oder root alle Karten
+Scratch space for the user to drop ideas as they come up, in whatever shape
+they arrive in. Tag priority with `(P:N)` — lower N is more urgent. This
+list is expected to be messy; do not silently clean up wording here.
+
+When asked to triage: pick a slot in the v1 milestones above (ordered by
+`(P:N)` where given, your judgment otherwise), rewrite it as a proper
+milestone bullet (what changes, which files), and remove it from this list.
+Don't triage on your own initiative — wait to be asked, since priority
+here is the user's call, not yours.
+
+- (none right now)
