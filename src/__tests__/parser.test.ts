@@ -226,3 +226,59 @@ describe("parseNote — inline clozes", () => {
     expect(cards[0].front).toContain("[language]");
   });
 });
+
+describe("cloze tables inside callouts (investigative — fix only if broken)", () => {
+  it("a single cloze in one table cell keeps the table structure intact", () => {
+    const md = [
+      "#flashcards",
+      "",
+      "> [!card] Elements",
+      "> | Element | Symbol |",
+      "> | --- | --- |",
+      "> | Hydrogen | ==H== |",
+      "> | Oxygen | ==O== |",
+    ].join("\n");
+    const cards = parseNote(md, "n.md", S);
+    expect(cards).toHaveLength(2); // H and O, no seq -> sibling cards
+    for (const card of cards) {
+      expect(card.front.split("\n")).toHaveLength(4);
+      expect(card.back).toBe(
+        "| Element | Symbol |\n| --- | --- |\n| Hydrogen | H |\n| Oxygen | O |",
+      );
+    }
+    expect(cards[0].front).toContain("| Hydrogen | [...] |");
+    expect(cards[0].front).toContain("| Oxygen | O |");
+  });
+
+  it("grouped seq clozes across table cells blank both cells on one card, table stays valid", () => {
+    const md = [
+      "#flashcards",
+      "",
+      "> [!card] Elements",
+      "> | Element | Symbol |",
+      "> | --- | --- |",
+      "> | Hydrogen | ==H==[^1] |",
+      "> | Oxygen | ==O==[^1] |",
+    ].join("\n");
+    const cards = parseNote(md, "n.md", S);
+    expect(cards).toHaveLength(1);
+    expect(cards[0].front.split("\n")).toHaveLength(4);
+    expect(cards[0].front).toContain("| Hydrogen | [...] |");
+    expect(cards[0].front).toContain("| Oxygen | [...] |");
+  });
+
+  it("an escaped pipe inside an answer round-trips without breaking the row", () => {
+    const md = [
+      "#flashcards",
+      "",
+      "> [!card] Ops",
+      "> | Expr | Result |",
+      "> | --- | --- |",
+      "> | Bitwise OR | ==A\\|B== |",
+    ].join("\n");
+    const cards = parseNote(md, "n.md", S);
+    expect(cards).toHaveLength(1);
+    expect(cards[0].front.split("\n")).toHaveLength(3);
+    expect(cards[0].back).toContain("A\\|B");
+  });
+});
