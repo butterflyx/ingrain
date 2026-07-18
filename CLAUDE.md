@@ -81,7 +81,8 @@ implement in the pure module. Only wire it into `main.ts` once tests are green.
 | Settings-triggered reindex | done | `main.ts` `FlowcardsSettingTab.hide()` → `saveSettings()` → `rebuildIndex()` |
 | Reverse-card due-date coordination | done | `types.ts` `Card.reverseOf`, `scheduler.ts` `coordinateSiblingDue` |
 | Per-callout deck-tag override | done | `parser.ts` `calloutCards()` — local `findDeckTags()` on the callout's own text |
-| Deck overview page + deck-scoped review | done | `main.ts` `DecksView` (linkable via `obsidian://flowcards-decks`), `decks.ts` `buildDeckTree`/`filterByDeck` |
+| Deck overview page + deck-scoped review | done | `main.ts` `DecksView` (linkable via `obsidian://flowcards-decks`), `decks.ts` `buildDeckTree`/`filterByDeck`; auto-refreshes on `active-leaf-change` + manual refresh-cw action; new notes indexed on vault `create`, not just `modify` |
+| Reset all learning progress | done | `main.ts` `FlowcardsPlugin.resetAllProgress()`, `ConfirmResetModal`, settings-tab "Danger zone" |
 | Configurable cloze pattern (custom regex) | dropped | user doesn't need this — highlight/bold toggle stays the permanent design |
 | Bases note-aggregate export | dropped | user doesn't need this — store-only stays the permanent design |
 
@@ -166,3 +167,4 @@ here is the user's call, not yours.
   into M6/M7 above; the P:1 "linkable learning page" idea turned out to
   already be satisfied by the M5 DecksView work — `obsidian://flowcards-decks`
   — so it wasn't triaged into a milestone, just dropped from this list)
+- Ich habe ein Beispiel-Canvas "Kollisionsdomänen" in dem dev-vault angelegt. Darin enthalten ist ein Bild und einige Karten mit einem gelben Rand, die Teile des Bild verdecken. Untersuche in wie weit das hilft um ein Image-occlusion-style clozes umzusetzen.
