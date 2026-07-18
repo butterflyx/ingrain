@@ -51,3 +51,11 @@ implement in the pure module. Only wire it into `main.ts` once tests are green.
 - M3: the review Modal (mobile + desktop) — plugs in at `startReview()`.
 - M4: configurable cloze patterns UI, optional Bases note-aggregate export.
 - Explicitly NOT in v1: reviewing whole notes.
+
+## ideas for roadmap planning
+
+- [ ] Schalter, mit dem festgelegt wird, ob cloze pattern nur innerhalb von
+  callouts gelten soll oder für die gesamte Notiz in den Einstellungen des plugins
+- [ ] cards should contain the headline of the paragraph where the card lives in the note, to give the student context. If there is no card, use the note name
+- [ ] icon für die sidebar um Karten zu lernen
+- [ ] icon in sidebar führt auf eine Übersichtsseite, auf der ich die subdecks zum lernen auswählen kann, oder root alle Karten
