@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseNote, extractDeck, extractClozes, hasDeckTag } from "../parser";
+import { parseNote, extractDeck, extractDecks, extractClozes, hasDeckTag } from "../parser";
 import { cardHash } from "../hash";
 import { DEFAULT_SETTINGS } from "../types";
 
@@ -18,6 +18,42 @@ describe("extractDeck", () => {
   it("reads from a frontmatter tag list", () => {
     const md = `---\ntags: [flashcards/os, other]\n---\nbody`;
     expect(extractDeck(md, S)).toBe("flashcards/os");
+  });
+});
+
+describe("extractDecks", () => {
+  it("falls back to [root] when no matching tag exists", () => {
+    expect(extractDecks("no tags here", S)).toEqual(["flashcards"]);
+  });
+
+  it("returns every inline tag, in text order", () => {
+    const md = "first #flashcards/a then later #flashcards/b";
+    expect(extractDecks(md, S)).toEqual(["flashcards/a", "flashcards/b"]);
+  });
+
+  it("frontmatter tags come before inline tags, regardless of text position", () => {
+    const md = `---\ntags: [flashcards/fm]\n---\n\n#flashcards/inline text`;
+    expect(extractDecks(md, S)).toEqual(["flashcards/fm", "flashcards/inline"]);
+  });
+
+  it("extractDeck() always equals the first element of extractDecks()", () => {
+    const md = "first #flashcards/a then later #flashcards/b";
+    expect(extractDeck(md, S)).toBe(extractDecks(md, S)[0]);
+  });
+});
+
+describe("card.decks — a card belongs to every matching tag", () => {
+  it("a note with two tags produces cards with both in decks, deck === decks[0]", () => {
+    const md = `#flashcards/a #flashcards/b\n\n> [!card] Term\n> Definition`;
+    const cards = parseNote(md, "n.md", S);
+    expect(cards[0].decks).toEqual(["flashcards/a", "flashcards/b"]);
+    expect(cards[0].deck).toBe(cards[0].decks[0]);
+  });
+
+  it("a note with a single tag still populates decks with that one entry", () => {
+    const md = `#flashcards/net\n\n> [!card] Term\n> Definition`;
+    const cards = parseNote(md, "n.md", S);
+    expect(cards[0].decks).toEqual(["flashcards/net"]);
   });
 });
 

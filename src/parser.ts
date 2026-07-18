@@ -53,8 +53,19 @@ function findDeckTags(md: string, settings: FlowcardsSettings): Set<string> {
  * (tag/subtag) is preserved verbatim so the review layer can build the tree.
  */
 export function extractDeck(md: string, settings: FlowcardsSettings): string {
+  return extractDecks(md, settings)[0];
+}
+
+/**
+ * Every deck this note's cards belong to: every tag under the configured
+ * root, in resolution order (frontmatter `tags:` list first, in list
+ * order; then inline `#tags`, in text order) — falls back to a single
+ * root-only entry when no tag matches. extractDeck() is always the first
+ * element of this array.
+ */
+export function extractDecks(md: string, settings: FlowcardsSettings): string[] {
   const tags = findDeckTags(md, settings);
-  return tags.size ? [...tags][0] : settings.deckTagRoot;
+  return tags.size ? [...tags] : [settings.deckTagRoot];
 }
 
 /**
@@ -153,7 +164,7 @@ function groupClozes(clozes: ClozeMatch[]): number[][] {
  *  loose clozes elsewhere in the note, where `[^seq]` must stay inert. */
 function clozeCards(
   block: string,
-  deck: string,
+  decks: string[],
   notePath: string,
   settings: FlowcardsSettings,
   allowSeq: boolean,
@@ -164,7 +175,8 @@ function clozeCards(
   return groupClozes(clozes).map((group, gi) => ({
     hash: cardHash(block, `cloze:${gi}`),
     notePath,
-    deck,
+    deck: decks[0],
+    decks,
     kind: "cloze" as const,
     front: renderCloze(block, clozes, new Set(group)),
     back,
@@ -215,7 +227,7 @@ export function findCallouts(body: string, settings: FlowcardsSettings): Callout
 
 function calloutCards(
   c: Callout,
-  deck: string,
+  decks: string[],
   notePath: string,
   settings: FlowcardsSettings,
 ): Omit<Card, "context">[] {
@@ -223,7 +235,7 @@ function calloutCards(
   // allowed here: c is already a callout of the configured type (see
   // findCallouts()), so this is exactly the "explicit card container" the
   // seq feature is scoped to.
-  const inner = clozeCards(c.body, deck, notePath, settings, true);
+  const inner = clozeCards(c.body, decks, notePath, settings, true);
   if (inner.length) return inner;
 
   const reverse = c.title.includes(settings.reverseEmoji) || c.body.includes(settings.reverseEmoji);
@@ -235,7 +247,8 @@ function calloutCards(
     {
       hash: cardHash(c.title + "\n" + c.body, "qa"),
       notePath,
-      deck,
+      deck: decks[0],
+      decks,
       kind: "callout-qa",
       front,
       back,
@@ -247,7 +260,8 @@ function calloutCards(
     cards.push({
       hash: cardHash(c.title + "\n" + c.body, "qa-rev"),
       notePath,
-      deck,
+      deck: decks[0],
+      decks,
       kind: "callout-qa",
       front: back,
       back: front,
@@ -285,7 +299,7 @@ function nearestHeading(headings: Heading[], offset: number): string | null {
 /** Top-level entry point. */
 export function parseNote(md: string, notePath: string, settings: FlowcardsSettings): Card[] {
   if (!hasDeckTag(md, settings)) return [];
-  const deck = extractDeck(md, settings);
+  const decks = extractDecks(md, settings);
   const { body } = splitFrontmatter(md);
   const cards: Card[] = [];
 
@@ -300,7 +314,7 @@ export function parseNote(md: string, notePath: string, settings: FlowcardsSetti
   const callouts = findCallouts(body, settings);
   for (const c of callouts) {
     const context = contextFor(c.raw);
-    for (const card of calloutCards(c, deck, notePath, settings)) cards.push({ ...card, context });
+    for (const card of calloutCards(c, decks, notePath, settings)) cards.push({ ...card, context });
   }
 
   // Clozes outside callouts: split remaining text into blank-line blocks,
@@ -318,7 +332,7 @@ export function parseNote(md: string, notePath: string, settings: FlowcardsSetti
       if ([...calloutRaw].some((raw) => raw.includes(trimmed) && trimmed)) continue;
       if (/^>\s*\[!/.test(trimmed)) continue;
       const context = contextFor(trimmed);
-      for (const card of clozeCards(trimmed, deck, notePath, settings, false)) {
+      for (const card of clozeCards(trimmed, decks, notePath, settings, false)) {
         cards.push({ ...card, context });
       }
     }

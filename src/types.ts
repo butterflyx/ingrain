@@ -15,8 +15,16 @@ export interface Card {
   hash: string;
   /** Current location. Mutable metadata only — NOT part of identity. */
   notePath: string;
-  /** Full tag path, e.g. "flashcards/network/suricata". */
+  /** Primary/display deck, e.g. "flashcards/network/suricata". Always
+   *  equal to decks[0] — kept as its own field since it's what gets shown
+   *  (e.g. the review Modal title), independent of how many decks below
+   *  the card also belongs to. */
   deck: string;
+  /** Every deck this card belongs to (every matching tag), in resolution
+   *  order. Card identity (hash) never depends on this — a card with
+   *  multiple decks is still reviewed exactly once; deck-scoped review
+   *  (M5) would show it under any of these. */
+  decks: string[];
   kind: CardKind;
   front: string;
   back: string;

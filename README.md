@@ -61,6 +61,12 @@ or simply `#flashcards/spanish` written anywhere in the note.
 Subtags build the deck path, so `#flashcards/spanish/verbs` groups those
 cards under `spanish/verbs`.
 
+A note can carry more than one deck tag — its cards then belong to all of
+those decks (relevant once you review a specific deck rather than
+everything), but each card is still reviewed exactly once, not once per
+deck. Frontmatter tags take priority over inline tags for which one is
+used to *display* the card's deck name.
+
 ### 2. Callouts become question/answer cards
 
 ```markdown

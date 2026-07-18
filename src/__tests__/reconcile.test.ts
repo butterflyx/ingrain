@@ -7,6 +7,7 @@ function card(hash: string, notePath: string): Card {
     hash,
     notePath,
     deck: "flashcards",
+    decks: ["flashcards"],
     kind: "basic",
     front: "f",
     back: "b",
