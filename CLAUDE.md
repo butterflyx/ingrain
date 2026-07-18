@@ -76,80 +76,70 @@ implement in the pure module. Only wire it into `main.ts` once tests are green.
 | Settings persistence | done | `main.ts` `PersistedData.settings`, `saveSettings()` |
 | Cloze seq-grouping (classic clozes, Generalized Overlapping) | done | `parser.ts` `groupClozes`/`extractClozes` — callout-only, `[^seq]` stays inert outside callouts to protect real footnotes |
 | Card context (nearest heading, filename fallback) | done | `parser.ts` `findHeadings`/`nearestHeading`, `types.ts` `Card.context` |
-| Cloze tables | done | `parser.ts` `extractClozes`/`tableHeaderRanges` — string-splicing already preserved structure; real bug found later via dev-vault repro (bold/highlighted header rows were misread as clozes), now filtered out regardless of callout scope |
+| Cloze tables | done | `parser.ts` `extractClozes`/`tableHeaderRanges` — table header rows excluded from cloze matching so bold/highlighted labels aren't misread as clozes |
 | Multi-deck tags (`Card.decks`) | done | `types.ts` `Card.decks`, `parser.ts` `extractDecks` |
 | Settings-triggered reindex | done | `main.ts` `FlowcardsSettingTab.hide()` → `saveSettings()` → `rebuildIndex()` |
 | Reverse-card due-date coordination | done | `types.ts` `Card.reverseOf`, `scheduler.ts` `coordinateSiblingDue` |
 | Per-callout deck-tag override | done | `parser.ts` `calloutCards()` — local `findDeckTags()` on the callout's own text |
-| Deck overview page + deck-scoped review | done | `main.ts` `DecksView` (linkable via `obsidian://flowcards-decks`), `decks.ts` `buildDeckTree`/`filterByDeck`; auto-refreshes on `active-leaf-change` + manual refresh-cw action; new notes indexed on vault `create`, not just `modify` |
+| Deck overview page + deck-scoped review | done | `main.ts` `DecksView`, `decks.ts` `buildDeckTree`/`filterByDeck`; linkable via `obsidian://flowcards-decks`; refreshes via `FlowcardsPlugin.notifyDecksChanged()` (pushed on every state change) + `active-leaf-change` + a manual refresh action |
+| New notes indexed on creation | done | `main.ts` `vault.on("create", ...)`, same path as `modify` |
 | Reset all learning progress | done | `main.ts` `FlowcardsPlugin.resetAllProgress()`, `ConfirmResetModal`, settings-tab "Danger zone" |
 | Configurable cloze pattern (custom regex) | dropped | user doesn't need this — highlight/bold toggle stays the permanent design |
 | Bases note-aggregate export | dropped | user doesn't need this — store-only stays the permanent design |
 
 ## v1 milestones
 
-Backlog ideas have been triaged into the milestones below, grouped by which
-part of the codebase they touch and ordered so smaller/independent pieces
-ship before the ones they'd otherwise block.
+Kept intentionally terse — the Implementation status table above is the
+source of truth for *what* shipped and *where*; this list is just the
+ordering/grouping history plus what's still open.
 
 - **M1 (done):** parser subset + hash + SM-2 + reconcile, all tested.
-- **M2 (done):** note-tag gating, cloze-scope setting, configurable callout
-  type, settings persistence, callout-only cloze seq-grouping, card
-  context (nearest heading). See Implementation status above.
-- **M3 (done):** the review Modal (mobile + desktop) — `src/review.ts`
-  (pure session state machine) + `ReviewModal` in `main.ts` (DOM glue).
-- **M4 (done): cloze/review correctness follow-ups.** Reliable cloze
-  tables (string-splicing was already safe; a real bug was found later —
-  bold/highlighted table header rows were misread as clozes, fixed via
-  `tableHeaderRanges()`), multi-deck tags (`Card.decks`, a card belongs to
-  every matching tag, reviewed once, first tag used for display), settings
-  changes reindex automatically on settings-tab close (not per keystroke
-  — see `FlowcardsSettingTab.hide()`), reverse-card due-date coordination
-  (`Card.reverseOf` + `coordinateSiblingDue()`), per-callout deck-tag
-  override. See Implementation status above.
-- **M5 (done): deck overview page & deck-scoped review.** `DecksView`
-  (an `ItemView`, opened as a normal tab — not a Modal) lists every deck
-  hierarchically with due/total counts (`decks.ts` `buildDeckTree`,
-  dedupes multi-deck cards per node) and an "All decks" shortcut.
-  Reachable via the ribbon icon (`graduation-cap`), the "Open deck
-  overview" command, or a plain Markdown link from any note —
-  `[Decks](obsidian://flowcards-decks)`, registered via
-  `registerObsidianProtocolHandler` since Obsidian wikilinks can't target
-  a view without file backing. Picking a deck opens `ReviewModal` scoped
-  to it (`startReview()` takes an optional `deckPath`, filtered via
-  `decks.ts` `filterByDeck()`) and passes an `onClose` callback so the
-  page's counts refresh the instant the review Modal closes. See
-  Implementation status above.
-- ~~M6: configurable cloze pattern UI, Bases export~~ — **dropped**, user
-  doesn't need this. See Implementation status above.
-- **M6 (not started): Canvas-based image clozes (P:2).** "Bilder cloze
-  mittels Canvas in Obsidian umsetzen. Boardmittel wo immer möglich."
-  Image-occlusion-style clozes (mark a region over an image, review shows
-  the image with that region blanked) using Obsidian's Canvas format.
-  Unresearched: `.canvas` files are JSON, a completely different track
-  from the Markdown string-parsing this plugin does today (`parser.ts`
-  doesn't apply at all) — needs investigation into the Canvas file format
-  and whatever rendering API Obsidian exposes before a real plan can be
-  written. "Boardmittel wo immer möglich" (prefer built-in means) points
-  toward reusing Canvas's native node/edge model rather than inventing a
-  new file format.
+- **M2 (done):** note-tag gating, cloze-scope setting, configurable
+  callout type, settings persistence, callout-only cloze seq-grouping,
+  card context.
+- **M3 (done):** the review Modal (`review.ts` + `main.ts` `ReviewModal`).
+- **M4 (done):** cloze/review correctness follow-ups — cloze tables,
+  multi-deck tags, settings-triggered reindex, reverse-card due-date
+  coordination, per-callout deck-tag override.
+- **M5 (done):** deck overview page (`DecksView`) & deck-scoped review.
+- **M6 (not started): DecksView rating breakdown (P:2).** "In DecksView
+  nicht nur die Anzahl der fälligen Karten, sondern auch eine farbliche
+  Statistik nach again/hard/good/easy — wie viele offene Karten sind
+  leicht, wie viele schwer, usw." Needs a design decision before
+  implementing: what defines a card's "difficulty tier" for this display
+  — `CardState.ease` (continuous, needs bucket thresholds) or the most
+  recent `reviewLog` entry's rating (discrete, but undefined for a
+  never-reviewed card)? Touches `decks.ts` `DeckNode` (a per-tier
+  breakdown alongside `dueCount`/`totalCount`) and `main.ts` `DecksView`
+  (color-coded rendering) — ask the user for the exact bucket definition
+  first.
 - **M7 (not started): time-based review reminder (P:2).** "Eine
   Erinnerung Zeit-basiert und konfigurierbar, zb alle N Tage." Needs a
-  design decision before implementing: a new `FlowcardsSettings` field
-  for the interval, a trigger mechanism (`Plugin.registerInterval()` for
-  an in-app timer is the obvious Obsidian-native option), and clarity on
-  what "every N days" means precisely (calendar-day interval? hours since
-  last review? only when cards are actually due?) — ask the user before
-  building this one.
-- **M8 (not started, was M7): polish & convenience.** All `(P:3)` from
-  the idea backlog — lowest urgency, ship after everything above.
-  1. Default CSS icon for card callouts, so they're visually distinct in
-     Reading/Live Preview without the user picking one manually.
-  2. Translate the settings tab (and other UI strings) into other
-     languages, starting with German.
-  3. A command that inserts a card-callout skeleton at the cursor —
-     Templater-snippet-style, to create cards faster.
+  design decision before implementing: a new `FlowcardsSettings` interval
+  field, a trigger mechanism (`Plugin.registerInterval()` is the obvious
+  Obsidian-native option), and what "every N days" means precisely
+  (calendar-day interval? hours since last review? only when cards are
+  actually due?) — ask the user first.
+- **M8 (not started): polish & convenience (P:3).** Default CSS icon for
+  card callouts; translate the settings tab (starting with German); a
+  command to insert a card-callout skeleton at the cursor.
 - Explicitly NOT in v1: reviewing whole notes.
+
+## Post-v1 (v2.0.0, deliberately deferred)
+
+- **Canvas-based image clozes.** "Bilder cloze mittels Canvas in Obsidian
+  umsetzen. Boardmittel wo immer möglich." Image-occlusion-style clozes
+  (mark a region over an image, review shows the image with that region
+  blanked) using Obsidian's Canvas format. User has a worked example in
+  the dev vault (`Kollisionsdomänen.canvas` — an image plus yellow-bordered
+  occlusion cards) to investigate against when this gets picked up.
+  Unresearched and explicitly out of v1 scope: `.canvas` files are JSON, a
+  completely different track from the Markdown string-parsing this plugin
+  does today (`parser.ts` doesn't apply at all) — needs investigation into
+  the Canvas file format and whatever rendering API Obsidian exposes
+  before a real plan can be written. "Boardmittel wo immer möglich"
+  (prefer built-in means) points toward reusing Canvas's native node/edge
+  model rather than inventing a new file format.
 
 ## Raw ideas (untriaged)
 
@@ -157,14 +147,10 @@ Scratch space for the user to drop ideas as they come up, in whatever shape
 they arrive in. Tag priority with `(P:N)` — lower N is more urgent. This
 list is expected to be messy; do not silently clean up wording here.
 
-When asked to triage: pick a slot in the v1 milestones above (ordered by
-`(P:N)` where given, your judgment otherwise), rewrite it as a proper
-milestone bullet (what changes, which files), and remove it from this list.
-Don't triage on your own initiative — wait to be asked, since priority
-here is the user's call, not yours.
+When asked to triage: pick a slot in the v1 milestones (or Post-v1) above
+(ordered by `(P:N)` where given, your judgment otherwise), rewrite it as a
+proper milestone bullet (what changes, which files), and remove it from
+this list. Don't triage on your own initiative — wait to be asked, since
+priority here is the user's call, not yours.
 
-- (none right now — Canvas image clozes and the time-based reminder went
-  into M6/M7 above; the P:1 "linkable learning page" idea turned out to
-  already be satisfied by the M5 DecksView work — `obsidian://flowcards-decks`
-  — so it wasn't triaged into a milestone, just dropped from this list)
-- Ich habe ein Beispiel-Canvas "Kollisionsdomänen" in dem dev-vault angelegt. Darin enthalten ist ein Bild und einige Karten mit einem gelben Rand, die Teile des Bild verdecken. Untersuche in wie weit das hilft um ein Image-occlusion-style clozes umzusetzen.
+- (none right now)

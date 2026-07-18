@@ -63,9 +63,9 @@ cards under `spanish/verbs`.
 
 A note can carry more than one deck tag — its cards then belong to all of
 those decks (relevant once you review a specific deck rather than
-everything), but each card is still reviewed exactly once, not once per
-deck. Frontmatter tags take priority over inline tags for which one is
-used to *display* the card's deck name.
+everything), but each card is still reviewed exactly once, never once per
+deck. When more than one tag matches, the first one found (frontmatter list
+before inline tags) is used to *display* the card's deck name.
 
 ### 2. Callouts become question/answer cards
 
@@ -86,6 +86,15 @@ Add the reverse emoji (🔁 by default) to also generate the reverse card:
 > Capital of France
 ```
 
+A callout can also carry its own deck tag, overriding the note's tag just
+for that one card — handy for a stray card that belongs somewhere more
+specific than the rest of the note:
+
+```markdown
+> [!card] #flashcards/spanish/idioms Estar en las nubes
+> To be daydreaming (literally: "to be in the clouds")
+```
+
 ### 3. Highlight or bold text becomes a cloze card
 
 Just mark the part of a sentence you want to be quizzed on:
@@ -102,8 +111,8 @@ the card with `^[hint text]`:
 The ==mitochondria==^[organelle] is the powerhouse of the cell.
 ```
 
-A sentence with multiple clozes produces one card per cloze, each revealing
-the others so you always see the sentence in context.
+A sentence with multiple clozes normally produces one card per cloze, each
+revealing the others so you always see the sentence in context.
 
 ### 4. Clozes inside a callout
 
@@ -115,6 +124,19 @@ single Q&A card — the title is ignored in that case:
 > The ==mitochondria== produces ==ATP== through cellular respiration.
 ```
 
+Inside a callout only, clozes sharing the same reference number collapse
+onto a single card that blanks all of them at once, instead of one card per
+cloze:
+
+```markdown
+> [!card] Water
+> Water is made of ==hydrogen==[^1] and ==oxygen==[^1] atoms.
+```
+
+(Outside a callout, `[^1]`-style references are left alone on purpose —
+that syntax is a real Obsidian footnote reference, and Flowcards won't
+touch it there.)
+
 ## Reviewing
 
 Open the command palette and run **Review due cards** to review
@@ -125,16 +147,18 @@ everything that's due across your whole vault right away. For each card:
 - `Esc` ends the session early — everything you've already rated is saved.
 
 Scheduling follows SM-2 (the same algorithm Anki popularized): a card you
-rate "Again" comes back soon, "Easy" pushes it further out.
+rate "Again" comes back soon, "Easy" pushes it further out. Reviewing one
+side of a reverse pair also pushes out the other side's due date, so you
+won't immediately be asked the same fact twice from opposite directions.
 
 ### The deck overview
 
 Click the graduation-cap icon in the ribbon (or run **Open deck
 overview**) to open a page listing every deck and subdeck with its
 **due/total** card count. Click a deck to start a review scoped to just
-that one — the counts on the page update the moment you close the review
-window, no need to reopen it. A card belonging to several deck tags shows
-up under each of them, but — like always — is only ever reviewed once.
+that one. The page keeps itself current — new or edited cards, and the
+counts after a review session, show up without reopening the tab — but a
+refresh button is there too if you want to force it.
 
 The overview opens as a normal tab, so it stays around, and you can link
 to it from any other note (e.g. your daily note) with a plain Markdown
@@ -143,6 +167,14 @@ link:
 ```markdown
 [Review decks](obsidian://flowcards-decks)
 ```
+
+## Keeping the index up to date
+
+Flowcards re-scans a note automatically when you create or edit it, and
+re-scans the whole vault when a setting that affects parsing changes
+(deck tag, callout type, cloze options). If something ever looks out of
+sync anyway, run **Rebuild index (sweep orphans)** from the command
+palette to force a full rescan.
 
 ## Settings
 
@@ -154,10 +186,9 @@ link:
 | Cloze: highlight / bold | Turn `==...==` and/or `**...**` recognition on or off independently. |
 | Cloze scope | **Whole note** (default): highlighted/bold text anywhere counts. **Inside callouts only**: loose highlights elsewhere in the note are ignored — callouts are unaffected either way. |
 
-At the bottom of the settings tab, a **Danger zone** has a "Reset
-everything" button that permanently deletes all scheduling history and
-starts every card fresh — behind a confirmation dialog, since it can't be
-undone.
+A **Danger zone** at the bottom has a "Reset everything" button that
+permanently deletes all scheduling history and starts every card fresh —
+behind a confirmation dialog, since it can't be undone.
 
 ## Current limitations
 
