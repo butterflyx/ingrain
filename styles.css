@@ -65,6 +65,11 @@
   color: var(--text-muted);
 }
 
+.flowcards-deck-none {
+  font-size: 0.8em;
+  color: var(--text-faint);
+}
+
 .flowcards-deck-total {
   font-size: 0.8em;
   color: var(--text-muted);

@@ -507,11 +507,14 @@ class DecksView extends ItemView {
       ["easy", "Easy", "flowcards-rating-easy"],
       ["new", "New", "flowcards-rating-new"],
     ];
+    let anyShown = false;
     for (const [key, label, cls] of parts) {
       const count = breakdown[key];
       if (count === 0) continue;
       container.createSpan({ cls: ["flowcards-rating-badge", cls], text: `${label} ${count}` });
+      anyShown = true;
     }
+    if (!anyShown) container.createSpan({ cls: "flowcards-deck-none", text: "–" });
     container.createSpan({ cls: "flowcards-deck-total", text: `| ${total}` });
   }
 }
