@@ -12,6 +12,7 @@ import {
   Setting,
   TFile,
   WorkspaceLeaf,
+  moment,
 } from "obsidian";
 import {
   Card,
@@ -44,6 +45,7 @@ import {
 import { coordinateSiblingDue } from "./scheduler";
 import { DeckNode, RatingBreakdown, buildDeckTree, filterByDeck } from "./decks";
 import { shouldShowReminder } from "./reminder";
+import { Key, t } from "./i18n";
 
 // This is the ONLY file that touches the Obsidian API. It stays thin on
 // purpose: parse + reconcile + schedule + the review session state machine
@@ -55,6 +57,12 @@ const VIEW_TYPE_DECKS = "flowcards-decks-view";
 export default class FlowcardsPlugin extends Plugin {
   settings: FlowcardsSettings = DEFAULT_SETTINGS;
   states: StateMap = {};
+  /** Read once at onload() from moment.locale() -- Obsidian bundles moment
+   *  and keeps its locale synced with Settings -> General -> Language, so
+   *  this is the standard way plugins pick up the user's UI language
+   *  without a dedicated language switcher. Only changes on Obsidian
+   *  restart, so a one-time read is enough. */
+  locale = "en";
   /** hash -> most-recently-parsed Card content. NOT persisted; rebuilt from
    *  the vault on load/rebuild and kept current by indexFile(). Exists only
    *  so the review Modal can render front/back for due hashes, since
@@ -83,6 +91,7 @@ export default class FlowcardsPlugin extends Plugin {
   }
 
   async onload() {
+    this.locale = moment.locale();
     await this.loadPersisted();
 
     // Keep path metadata fresh on rename. Non-load-bearing: identity is the
@@ -113,25 +122,25 @@ export default class FlowcardsPlugin extends Plugin {
 
     this.addCommand({
       id: "review-due",
-      name: "Review due cards",
+      name: t(this.locale, "cmdReviewDue"),
       callback: () => this.startReview(),
     });
 
     this.addCommand({
       id: "rebuild-index",
-      name: "Rebuild index (sweep orphans)",
+      name: t(this.locale, "cmdRebuildIndex"),
       callback: () => this.rebuildIndex(),
     });
 
     this.addCommand({
       id: "browse-decks",
-      name: "Open deck overview",
+      name: t(this.locale, "cmdOpenDecks"),
       callback: () => void this.activateDecksView(),
     });
 
     this.addCommand({
       id: "insert-card-skeleton",
-      name: "Insert card skeleton",
+      name: t(this.locale, "cmdInsertSkeleton"),
       editorCallback: (editor: Editor) => {
         const type = this.settings.calloutType || "card";
         const prefix = `> [!${type}] `;
@@ -150,7 +159,7 @@ export default class FlowcardsPlugin extends Plugin {
     // plugin view without file backing.
     this.registerObsidianProtocolHandler("flowcards-decks", () => void this.activateDecksView());
 
-    this.addRibbonIcon("graduation-cap", "Open deck overview", () => void this.activateDecksView());
+    this.addRibbonIcon("graduation-cap", t(this.locale, "ribbonOpenDecks"), () => void this.activateDecksView());
 
     // Full sweep on load to purge states from deleted notes.
     this.app.workspace.onLayoutReady(() => void this.rebuildIndex());
@@ -171,7 +180,7 @@ export default class FlowcardsPlugin extends Plugin {
       return;
     }
     const due = dueCards(this.states).length;
-    const notice = new Notice(`Flowcards: ${due} card(s) due. Click to review.`, 10000);
+    const notice = new Notice(t(this.locale, "noticeReminderDue", { count: due }), 10000);
     notice.noticeEl.addEventListener("click", () => void this.activateDecksView());
     this.lastReminderShown = new Date().toISOString();
     void this.save();
@@ -227,7 +236,11 @@ export default class FlowcardsPlugin extends Plugin {
   startReview(deckPath?: string, onClose?: () => void) {
     const due = filterByDeck(dueCards(this.states), this.cardCache, deckPath);
     if (!due.length) {
-      new Notice(deckPath ? `Flowcards: no cards due in ${deckPath}.` : "Flowcards: no cards due.");
+      new Notice(
+        deckPath
+          ? t(this.locale, "noticeNoCardsDueInDeck", { deck: deckPath })
+          : t(this.locale, "noticeNoCardsDue"),
+      );
       return;
     }
 
@@ -241,7 +254,7 @@ export default class FlowcardsPlugin extends Plugin {
     }
 
     if (!resolved.length) {
-      new Notice("Flowcards: still indexing, try again in a moment.");
+      new Notice(t(this.locale, "noticeStillIndexing"));
       return;
     }
 
@@ -386,7 +399,13 @@ class ReviewModal extends Modal {
     if (!card) return; // unreachable: cardsByHash is built from the same due set
     const progress = sessionProgress(this.session);
 
-    this.titleEl.setText(`${card.deck} — ${progress.reviewed + 1} of ${progress.total}`);
+    this.titleEl.setText(
+      t(this.plugin.locale, "reviewProgressTitle", {
+        deck: card.deck,
+        current: progress.reviewed + 1,
+        total: progress.total,
+      }),
+    );
 
     this.contentEl.createDiv({ cls: "flowcards-context", text: card.context });
 
@@ -395,7 +414,7 @@ class ReviewModal extends Modal {
 
     if (!this.session.revealed) {
       new ButtonComponent(this.contentEl)
-        .setButtonText("Show answer")
+        .setButtonText(t(this.plugin.locale, "reviewShowAnswer"))
         .setCta()
         .onClick(() => this.handleReveal());
       return;
@@ -406,25 +425,25 @@ class ReviewModal extends Modal {
     void MarkdownRenderer.render(this.app, card.back, backEl, card.notePath, this.mdComponent);
 
     const ratingRow = this.contentEl.createDiv({ cls: "flowcards-ratings" });
-    const buttons: [Rating, string][] = [
-      [1, "Again"],
-      [2, "Hard"],
-      [3, "Good"],
-      [4, "Easy"],
+    const buttons: [Rating, Key][] = [
+      [1, "ratingAgain"],
+      [2, "ratingHard"],
+      [3, "ratingGood"],
+      [4, "ratingEasy"],
     ];
-    for (const [rating, label] of buttons) {
+    for (const [rating, key] of buttons) {
       new ButtonComponent(ratingRow)
-        .setButtonText(`${label} (${rating})`)
+        .setButtonText(`${t(this.plugin.locale, key)} (${rating})`)
         .onClick(() => this.handleRate(rating));
     }
   }
 
   private renderComplete() {
     const progress = sessionProgress(this.session);
-    this.titleEl.setText("Review complete");
-    this.contentEl.createEl("p", { text: `Reviewed ${progress.total} card(s).` });
+    this.titleEl.setText(t(this.plugin.locale, "reviewComplete"));
+    this.contentEl.createEl("p", { text: t(this.plugin.locale, "reviewedCount", { count: progress.total }) });
     new ButtonComponent(this.contentEl)
-      .setButtonText("Close")
+      .setButtonText(t(this.plugin.locale, "close"))
       .setCta()
       .onClick(() => this.close());
   }
@@ -449,7 +468,7 @@ class DecksView extends ItemView {
   }
 
   getDisplayText(): string {
-    return "Flowcards decks";
+    return t(this.plugin.locale, "decksViewTitle");
   }
 
   getIcon(): string {
@@ -458,7 +477,7 @@ class DecksView extends ItemView {
 
   async onOpen() {
     this.render();
-    this.addAction("refresh-cw", "Refresh", () => this.render());
+    this.addAction("refresh-cw", t(this.plugin.locale, "decksRefreshAction"), () => this.render());
     // A tab that was already open doesn't otherwise learn that
     // plugin.states/cardCache changed in the background (e.g. a note was
     // edited while this tab wasn't focused) -- refresh whenever it becomes
@@ -480,17 +499,17 @@ class DecksView extends ItemView {
   render = () => {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl("h2", { text: "Decks" });
+    contentEl.createEl("h2", { text: t(this.plugin.locale, "decksHeading") });
 
     const totalDue = dueCards(this.plugin.states).length;
     new ButtonComponent(contentEl)
-      .setButtonText(`All decks (${totalDue} due)`)
+      .setButtonText(t(this.plugin.locale, "decksAllDue", { count: totalDue }))
       .setCta()
       .onClick(() => this.plugin.startReview(undefined, this.render));
 
     const tree = buildDeckTree(this.plugin.states, this.plugin.cardCache);
     if (!tree.length) {
-      contentEl.createEl("p", { text: "No cards indexed yet." });
+      contentEl.createEl("p", { text: t(this.plugin.locale, "decksEmpty") });
       return;
     }
     const list = contentEl.createDiv({ cls: "flowcards-deck-tree" });
@@ -513,17 +532,18 @@ class DecksView extends ItemView {
    *  deck, followed by the total card count. Replaces a plain "(due/total)"
    *  text label -- categories with zero cards are skipped entirely. */
   private renderBreakdown(container: HTMLElement, breakdown: RatingBreakdown, total: number) {
-    const parts: [keyof RatingBreakdown, string, string][] = [
-      ["again", "Again", "flowcards-rating-again"],
-      ["hard", "Hard", "flowcards-rating-hard"],
-      ["good", "Good", "flowcards-rating-good"],
-      ["easy", "Easy", "flowcards-rating-easy"],
-      ["new", "New", "flowcards-rating-new"],
+    const parts: [keyof RatingBreakdown, Key, string][] = [
+      ["again", "ratingAgain", "flowcards-rating-again"],
+      ["hard", "ratingHard", "flowcards-rating-hard"],
+      ["good", "ratingGood", "flowcards-rating-good"],
+      ["easy", "ratingEasy", "flowcards-rating-easy"],
+      ["new", "ratingNew", "flowcards-rating-new"],
     ];
     let anyShown = false;
-    for (const [key, label, cls] of parts) {
+    for (const [key, labelKey, cls] of parts) {
       const count = breakdown[key];
       if (count === 0) continue;
+      const label = t(this.plugin.locale, labelKey);
       container.createSpan({ cls: ["flowcards-rating-badge", cls], text: `${label} ${count}` });
       anyShown = true;
     }
@@ -535,21 +555,19 @@ class DecksView extends ItemView {
 /** Second confirmation hurdle before wiping every card's scheduling
  *  history -- deliberately not a one-click action from the settings tab. */
 class ConfirmResetModal extends Modal {
-  constructor(app: App, private onConfirm: () => void) {
+  constructor(app: App, private locale: string, private onConfirm: () => void) {
     super(app);
   }
 
   onOpen() {
-    this.titleEl.setText("Reset all learning progress?");
-    this.contentEl.createEl("p", {
-      text:
-        "This permanently deletes scheduling history (ease, interval, " +
-        "review log) for every card in your vault. This cannot be undone.",
-    });
+    this.titleEl.setText(t(this.locale, "confirmResetTitle"));
+    this.contentEl.createEl("p", { text: t(this.locale, "confirmResetBody") });
     const row = this.contentEl.createDiv({ cls: "flowcards-confirm-row" });
-    new ButtonComponent(row).setButtonText("Cancel").onClick(() => this.close());
     new ButtonComponent(row)
-      .setButtonText("Reset everything")
+      .setButtonText(t(this.locale, "cancel"))
+      .onClick(() => this.close());
+    new ButtonComponent(row)
+      .setButtonText(t(this.locale, "resetEverything"))
       .setWarning()
       .onClick(() => {
         this.close();
@@ -570,44 +588,46 @@ class FlowcardsSettingTab extends PluginSettingTab {
     containerEl.empty();
     this.dirty = false;
 
+    const locale = this.plugin.locale;
+
     new Setting(containerEl)
-      .setName("Deck tag root")
-      .setDesc("Tag prefix that marks notes containing cards, e.g. flashcards")
-      .addText((t) =>
-        t.setValue(this.plugin.settings.deckTagRoot).onChange((v) => {
+      .setName(t(locale, "deckTagRootName"))
+      .setDesc(t(locale, "deckTagRootDesc"))
+      .addText((txt) =>
+        txt.setValue(this.plugin.settings.deckTagRoot).onChange((v) => {
           this.plugin.settings.deckTagRoot = v.trim();
           this.dirty = true;
         }),
       );
 
     new Setting(containerEl)
-      .setName("Reverse emoji")
-      .setDesc("Marks a Q&A card as reversible")
-      .addText((t) =>
-        t.setValue(this.plugin.settings.reverseEmoji).onChange((v) => {
+      .setName(t(locale, "reverseEmojiName"))
+      .setDesc(t(locale, "reverseEmojiDesc"))
+      .addText((txt) =>
+        txt.setValue(this.plugin.settings.reverseEmoji).onChange((v) => {
           this.plugin.settings.reverseEmoji = v.trim();
           this.dirty = true;
         }),
       );
 
     new Setting(containerEl)
-      .setName("Callout type")
-      .setDesc("Only callouts of this type (e.g. [!card]) become cards")
-      .addText((t) =>
-        t.setValue(this.plugin.settings.calloutType).onChange((v) => {
+      .setName(t(locale, "calloutTypeName"))
+      .setDesc(t(locale, "calloutTypeDesc"))
+      .addText((txt) =>
+        txt.setValue(this.plugin.settings.calloutType).onChange((v) => {
           this.plugin.settings.calloutType = v.trim();
           this.dirty = true;
         }),
       );
 
-    new Setting(containerEl).setName("Cloze: highlight (==...==)").addToggle((tg) =>
+    new Setting(containerEl).setName(t(locale, "clozeHighlightName")).addToggle((tg) =>
       tg.setValue(this.plugin.settings.cloze.highlight).onChange((v) => {
         this.plugin.settings.cloze.highlight = v;
         this.dirty = true;
       }),
     );
 
-    new Setting(containerEl).setName("Cloze: bold (**...**)").addToggle((tg) =>
+    new Setting(containerEl).setName(t(locale, "clozeBoldName")).addToggle((tg) =>
       tg.setValue(this.plugin.settings.cloze.bold).onChange((v) => {
         this.plugin.settings.cloze.bold = v;
         this.dirty = true;
@@ -615,16 +635,12 @@ class FlowcardsSettingTab extends PluginSettingTab {
     );
 
     new Setting(containerEl)
-      .setName("Cloze scope")
-      .setDesc(
-        "Where cloze markers count as cards. Callouts are always card " +
-          "candidates either way — this only controls loose clozes in the " +
-          "rest of the note.",
-      )
+      .setName(t(locale, "clozeScopeName"))
+      .setDesc(t(locale, "clozeScopeDesc"))
       .addDropdown((d) =>
         d
-          .addOption("anywhere", "Whole note")
-          .addOption("callout-only", "Inside callouts only")
+          .addOption("anywhere", t(locale, "clozeScopeAnywhere"))
+          .addOption("callout-only", t(locale, "clozeScopeCalloutOnly"))
           .setValue(this.plugin.settings.cloze.scope)
           .onChange((v) => {
             this.plugin.settings.cloze.scope = v as ClozeScope;
@@ -633,31 +649,28 @@ class FlowcardsSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("Review reminder")
-      .setDesc(
-        "Show a reminder if you haven't reviewed in this many days (0 disables it). " +
-          "Only shown when cards are actually due.",
-      )
-      .addText((t) =>
-        t.setValue(String(this.plugin.settings.reminderIntervalDays)).onChange((v) => {
+      .setName(t(locale, "reminderName"))
+      .setDesc(t(locale, "reminderDesc"))
+      .addText((txt) =>
+        txt.setValue(String(this.plugin.settings.reminderIntervalDays)).onChange((v) => {
           const n = parseInt(v, 10);
           this.plugin.settings.reminderIntervalDays = Number.isFinite(n) && n >= 0 ? n : 0;
           this.dirty = true;
         }),
       );
 
-    containerEl.createEl("h3", { text: "Danger zone" });
+    containerEl.createEl("h3", { text: t(locale, "dangerZone") });
     new Setting(containerEl)
-      .setName("Reset all learning progress")
-      .setDesc("Deletes every card's scheduling history and starts fresh. This cannot be undone.")
+      .setName(t(locale, "resetName"))
+      .setDesc(t(locale, "resetDesc"))
       .addButton((btn) =>
         btn
-          .setButtonText("Reset everything")
+          .setButtonText(t(locale, "resetEverything"))
           .setWarning()
           .onClick(() => {
-            new ConfirmResetModal(this.app, async () => {
+            new ConfirmResetModal(this.app, locale, async () => {
               await this.plugin.resetAllProgress();
-              new Notice("Flowcards: all learning progress has been reset.");
+              new Notice(t(locale, "noticeProgressReset"));
             }).open();
           }),
       );
