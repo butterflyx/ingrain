@@ -90,7 +90,25 @@ ship before the ones they'd otherwise block.
   context (nearest heading). See Implementation status above.
 - **M3 (done):** the review Modal (mobile + desktop) — `src/review.ts`
   (pure session state machine) + `ReviewModal` in `main.ts` (DOM glue).
-- **M4 (not started): sidebar navigation & deck-scoped review.**
+- **M4 (not started): cloze/review correctness follow-ups.** Triaged from
+  the idea backlog, in `(P:N)` order.
+  1. **(P:1) Reliable cloze tables** — clozes inside Markdown tables should
+     render correctly instead of risking broken table syntax. Unblocked
+     now that M2 shipped cloze grouping. Scope the first pass to tables
+     inside callouts only (`parser.ts` `clozeCards()`/`renderCloze()`);
+     loose tables outside callouts can follow later.
+  2. **(P:2) Settings change triggers a reindex** — right now
+     `saveSettings()` only persists; the user must manually run "Rebuild
+     index" for e.g. a changed `calloutType` or `deckTagRoot` to take
+     effect. Most users would expect this automatically (`main.ts`
+     `saveSettings()` → call `rebuildIndex()`).
+  3. **(P:2) Reverse-card due-date coordination** — reviewing one side of a
+     reverse pair currently leaves the other side's `CardState` untouched,
+     so it can still show up as due in the same/next session right after.
+     Needs a way to push the sibling's `due` out when its pair is reviewed
+     (`scheduler.ts` and/or `reconcile.ts`, plus a way to link reverse
+     pairs — they aren't linked today beyond sharing a `sourceBlock`).
+- **M5 (not started, was M4): sidebar navigation & deck-scoped review.**
   1. Ribbon icon that opens "Review due cards" directly — trivial, zero new
      logic, ships first (`main.ts` `addRibbonIcon`).
   2. An overview view/modal listing decks with due counts, so the user can
@@ -98,9 +116,17 @@ ship before the ones they'd otherwise block.
      needs `dueCards()`/`startReview()` to accept an optional deck-path
      filter, plus a small pure helper to build a deck tree + counts from
      the store.
-- **M5 (not started, was M4):** configurable cloze pattern UI (custom
+- **M6 (not started, was M5):** configurable cloze pattern UI (custom
   regex beyond the highlight/bold toggle), optional Bases note-aggregate
   export.
+- **M7 (not started): polish & convenience.** All `(P:3)` from the idea
+  backlog — lowest urgency, ship after everything above.
+  1. Default CSS icon for card callouts, so they're visually distinct in
+     Reading/Live Preview without the user picking one manually.
+  2. Translate the settings tab (and other UI strings) into other
+     languages, starting with German.
+  3. A command that inserts a card-callout skeleton at the cursor —
+     Templater-snippet-style, to create cards faster.
 - Explicitly NOT in v1: reviewing whole notes.
 
 ## Raw ideas (untriaged)
@@ -115,9 +141,4 @@ milestone bullet (what changes, which files), and remove it from this list.
 Don't triage on your own initiative — wait to be asked, since priority
 here is the user's call, not yours.
 
-- eigenes default icon für Karten callouts im css (P:3) 
-- Markdown-Tabellen mit Clozes müssen zuverlässig funktionieren. Zuvor muss die Gruppierung von Clozes funktionieren. Ein zulässiger Zwischenschritt wäre, dass das zunächst nur für Tabellen innerhalb von cards funktioniert. (P:1)
-- Übersetzung der Settings usw in andere Sprachen, iB Deutsch (P:3)
-- Settings-Änderung löst Re-Index aus. Das würden die meisten User erwarten (P:2)
-- Bei Reverse Karten: wenn eine Seite abgefragt wurde, die andere auf einen späteren Zeitpunkt verschieben, also nicht mehr aktuell offen. (P:2)
-- einen Befehl der einen card callout-skeleton an der aktuellen Cursor Position einfügt. Analog einer Vorlage für das templater plugin. Damit man schneller Karten anlegen kann (P:3)
+- (none right now — everything triaged into M4/M7 above)
