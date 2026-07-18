@@ -1,8 +1,22 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting, TFile } from "obsidian";
 import {
+  App,
+  ButtonComponent,
+  Component,
+  MarkdownRenderer,
+  Modal,
+  Notice,
+  Plugin,
+  PluginSettingTab,
+  Setting,
+  TFile,
+} from "obsidian";
+import {
+  Card,
+  CardState,
   DEFAULT_SETTINGS,
   FlowcardsSettings,
   PersistedData,
+  Rating,
   StateMap,
 } from "./types";
 import { parseNote } from "./parser";
@@ -12,14 +26,30 @@ import {
   sweepOrphans,
   dueCards,
 } from "./reconcile";
+import {
+  ReviewSessionState,
+  canRate,
+  canReveal,
+  currentCard,
+  isComplete,
+  rate,
+  reveal,
+  sessionProgress,
+  startSession,
+} from "./review";
 
 // This is the ONLY file that touches the Obsidian API. It stays thin on
-// purpose: parse + reconcile + schedule are all pure and tested elsewhere.
-// The review Modal (Milestone 3) plugs in where startReview() is stubbed.
+// purpose: parse + reconcile + schedule + the review session state machine
+// are all pure and tested elsewhere; ReviewModal below only wires DOM to it.
 
 export default class FlowcardsPlugin extends Plugin {
   settings: FlowcardsSettings = DEFAULT_SETTINGS;
   states: StateMap = {};
+  /** hash -> most-recently-parsed Card content. NOT persisted; rebuilt from
+   *  the vault on load/rebuild and kept current by indexFile(). Exists only
+   *  so the review Modal can render front/back for due hashes, since
+   *  CardState alone has no renderable content. */
+  cardCache: Record<string, Card> = {};
 
   async onload() {
     await this.loadPersisted();
@@ -69,6 +99,8 @@ export default class FlowcardsPlugin extends Plugin {
     const cards = parseNote(md, file.path, this.settings);
     const result = reconcileNote(cards, this.states, file.path);
     this.states = result.states;
+    for (const c of cards) this.cardCache[c.hash] = c;
+    for (const h of result.orphaned) delete this.cardCache[h];
     await this.save();
   }
 
@@ -79,16 +111,47 @@ export default class FlowcardsPlugin extends Plugin {
       const cards = parseNote(md, file.path, this.settings);
       const result = reconcileNote(cards, this.states, file.path);
       this.states = result.states;
-      for (const c of cards) live.add(c.hash);
+      for (const c of cards) {
+        live.add(c.hash);
+        this.cardCache[c.hash] = c;
+      }
+      for (const h of result.orphaned) delete this.cardCache[h];
     }
-    this.states = sweepOrphans(this.states, live).states;
+    const swept = sweepOrphans(this.states, live);
+    this.states = swept.states;
+    for (const h of swept.purged) delete this.cardCache[h];
     await this.save();
   }
 
   private startReview() {
     const due = dueCards(this.states);
-    // TODO Milestone 3: open the review Modal here.
-    new Notice(`Flowcards: ${due.length} card(s) due.`);
+    if (!due.length) {
+      new Notice("Flowcards: no cards due.");
+      return;
+    }
+
+    const resolved: CardState[] = [];
+    const cardsByHash = new Map<string, Card>();
+    for (const state of due) {
+      const card = this.cardCache[state.hash];
+      if (!card) continue; // indexing race: rebuildIndex() runs async, unawaited
+      resolved.push(state);
+      cardsByHash.set(state.hash, card);
+    }
+
+    if (!resolved.length) {
+      new Notice("Flowcards: still indexing, try again in a moment.");
+      return;
+    }
+
+    new ReviewModal(this.app, this, resolved, cardsByHash).open();
+  }
+
+  /** Persist the result of a single review. Write-through (not batched) so
+   *  progress survives an app kill mid-session on mobile. */
+  async recordReview(hash: string, state: CardState): Promise<void> {
+    this.states = { ...this.states, [hash]: state };
+    await this.save();
   }
 
   private async loadPersisted() {
@@ -100,6 +163,127 @@ export default class FlowcardsPlugin extends Plugin {
   private async save() {
     const data: PersistedData = { schema: 1, states: this.states };
     await this.saveData(data);
+  }
+}
+
+/**
+ * DOM-wiring glue only — every state transition (reveal, rate, progress,
+ * completion) is delegated to the pure session state machine in review.ts,
+ * which is what vitest actually covers. This class itself can only be
+ * verified manually in a live vault (see CLAUDE.md).
+ */
+class ReviewModal extends Modal {
+  private session: ReviewSessionState;
+  private readonly cardsByHash: Map<string, Card>;
+  private readonly mdComponent = new Component();
+
+  constructor(
+    app: App,
+    private plugin: FlowcardsPlugin,
+    due: CardState[],
+    cardsByHash: Map<string, Card>,
+  ) {
+    super(app);
+    this.session = startSession(due);
+    // Snapshot passed in by the caller, not read live from plugin.cardCache,
+    // so a modify event on an unrelated note during the session can't change
+    // what's displayed mid-review.
+    this.cardsByHash = cardsByHash;
+  }
+
+  onOpen() {
+    this.mdComponent.load();
+    this.registerKeymap();
+    this.render();
+  }
+
+  onClose() {
+    this.mdComponent.unload();
+    this.contentEl.empty();
+  }
+
+  private registerKeymap() {
+    // Desktop-only enhancement layered on top of the buttons below, which
+    // remain the primary interaction path (isDesktopOnly: false in the
+    // manifest — Obsidian Mobile has no keyboard by default).
+    this.scope.register([], " ", (evt) => {
+      evt.preventDefault();
+      this.handleReveal();
+    });
+    this.scope.register([], "Enter", () => this.handleReveal());
+    this.scope.register([], "1", () => this.handleRate(1));
+    this.scope.register([], "2", () => this.handleRate(2));
+    this.scope.register([], "3", () => this.handleRate(3));
+    this.scope.register([], "4", () => this.handleRate(4));
+    // Esc: Modal's default keymap already closes on Escape.
+  }
+
+  private handleReveal() {
+    if (!canReveal(this.session)) return;
+    this.session = reveal(this.session);
+    this.render();
+  }
+
+  private handleRate(rating: Rating) {
+    if (!canRate(this.session)) return;
+    const { session, updatedState } = rate(this.session, rating);
+    this.session = session;
+    void this.plugin.recordReview(updatedState.hash, updatedState);
+    this.render();
+  }
+
+  private render() {
+    this.contentEl.empty();
+    if (isComplete(this.session)) this.renderComplete();
+    else this.renderCard();
+  }
+
+  private renderCard() {
+    const state = currentCard(this.session);
+    if (!state) return; // unreachable: render() already checked isComplete()
+    const card = this.cardsByHash.get(state.hash);
+    if (!card) return; // unreachable: cardsByHash is built from the same due set
+    const progress = sessionProgress(this.session);
+
+    this.titleEl.setText(`${card.deck} — ${progress.reviewed + 1} of ${progress.total}`);
+
+    const frontEl = this.contentEl.createDiv({ cls: "flowcards-front" });
+    void MarkdownRenderer.render(this.app, card.front, frontEl, card.notePath, this.mdComponent);
+
+    if (!this.session.revealed) {
+      new ButtonComponent(this.contentEl)
+        .setButtonText("Show answer")
+        .setCta()
+        .onClick(() => this.handleReveal());
+      return;
+    }
+
+    this.contentEl.createEl("hr");
+    const backEl = this.contentEl.createDiv({ cls: "flowcards-back" });
+    void MarkdownRenderer.render(this.app, card.back, backEl, card.notePath, this.mdComponent);
+
+    const ratingRow = this.contentEl.createDiv({ cls: "flowcards-ratings" });
+    const buttons: [Rating, string][] = [
+      [1, "Again"],
+      [2, "Hard"],
+      [3, "Good"],
+      [4, "Easy"],
+    ];
+    for (const [rating, label] of buttons) {
+      new ButtonComponent(ratingRow)
+        .setButtonText(`${label} (${rating})`)
+        .onClick(() => this.handleRate(rating));
+    }
+  }
+
+  private renderComplete() {
+    const progress = sessionProgress(this.session);
+    this.titleEl.setText("Review complete");
+    this.contentEl.createEl("p", { text: `Reviewed ${progress.total} card(s).` });
+    new ButtonComponent(this.contentEl)
+      .setButtonText("Close")
+      .setCta()
+      .onClick(() => this.close());
   }
 }
 

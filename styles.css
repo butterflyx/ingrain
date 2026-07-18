@@ -1,0 +1,19 @@
+.flowcards-front {
+  font-size: 1.1em;
+  margin-bottom: 1em;
+}
+
+.flowcards-back {
+  margin: 1em 0;
+  color: var(--text-muted);
+}
+
+.flowcards-ratings {
+  display: flex;
+  gap: 0.5em;
+  margin-top: 1em;
+}
+
+.flowcards-ratings button {
+  flex: 1;
+}
