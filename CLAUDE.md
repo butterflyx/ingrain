@@ -84,7 +84,7 @@ implement in the pure module. Only wire it into `main.ts` once tests are green.
 | Deck overview page + deck-scoped review | done | `main.ts` `DecksView`, `decks.ts` `buildDeckTree`/`filterByDeck`; linkable via `obsidian://flowcards-decks`; refreshes via `FlowcardsPlugin.notifyDecksChanged()` (pushed on every state change) + `active-leaf-change` + a manual refresh action |
 | New notes indexed on creation | done | `main.ts` `vault.on("create", ...)`, same path as `modify` |
 | Reset all learning progress | done | `main.ts` `FlowcardsPlugin.resetAllProgress()`, `ConfirmResetModal`, settings-tab "Danger zone" |
-| DecksView rating breakdown | done | `decks.ts` `DeckNode.dueByRating`/`classify()`, `main.ts` `DecksView.renderBreakdown()` — colored Again/Hard/Good/Easy/New badges + total, replaces the old due/total label |
+| DecksView rating breakdown | done | `decks.ts` `DeckNode.dueByRating`/`classify()`, `main.ts` `DecksView.renderBreakdown()` — colored Again/Hard/Good/Easy/New badges + total, replaces the old due/total label. Scoped to currently-due cards, by design (confirmed with user after live-testing raised it) — since `scheduler.ts` gives every rating a minimum 1-day interval, a card rated today always leaves the due set until at least tomorrow, so Again/Hard/Good/Easy can only show counts for cards rated on a *previous* day that are due again now. Same-day testing will only ever show "New" until the vault has multi-day history. Not a bug. |
 | Configurable cloze pattern (custom regex) | dropped | user doesn't need this — highlight/bold toggle stays the permanent design |
 | Bases note-aggregate export | dropped | user doesn't need this — store-only stays the permanent design |
 

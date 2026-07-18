@@ -157,7 +157,11 @@ Click the graduation-cap icon in the ribbon (or run **Open deck
 overview**) to open a page listing every deck and subdeck. Each row shows
 its due cards broken down by how you last rated them — colored **Again /
 Hard / Good / Easy** badges, plus **New** for due cards you haven't
-reviewed yet — followed by the deck's total card count. Click a deck to
+reviewed yet — followed by the deck's total card count. Since rating a
+card always reschedules it to at least tomorrow, Again/Hard/Good/Easy
+only fill in for cards you rated on an *earlier* day that are due again
+now — reviewing a batch of cards for the first time will show them all
+under New until some of that history has built up. Click a deck to
 start a review scoped to just that one. The page keeps itself current —
 new or edited cards, and the counts after a review session, show up
 without reopening the tab — but a refresh button is there too if you want
