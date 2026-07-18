@@ -154,6 +154,11 @@ link:
 | Cloze: highlight / bold | Turn `==...==` and/or `**...**` recognition on or off independently. |
 | Cloze scope | **Whole note** (default): highlighted/bold text anywhere counts. **Inside callouts only**: loose highlights elsewhere in the note are ignored — callouts are unaffected either way. |
 
+At the bottom of the settings tab, a **Danger zone** has a "Reset
+everything" button that permanently deletes all scheduling history and
+starts every card fresh — behind a confirmation dialog, since it can't be
+undone.
+
 ## Current limitations
 
 - Cloze recognition is highlight/bold only — no custom regex pattern, and

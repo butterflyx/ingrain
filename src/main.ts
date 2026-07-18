@@ -80,6 +80,14 @@ export default class FlowcardsPlugin extends Plugin {
       }),
     );
 
+    // Index a brand-new note as soon as it's created, not just on edit --
+    // otherwise cards in it wouldn't show up until the next full rebuild.
+    this.registerEvent(
+      this.app.vault.on("create", (file) => {
+        if (file instanceof TFile && file.extension === "md") void this.indexFile(file);
+      }),
+    );
+
     this.addCommand({
       id: "review-due",
       name: "Review due cards",
@@ -216,6 +224,15 @@ export default class FlowcardsPlugin extends Plugin {
    *  rebuildIndex() already calls save() at the end, persisting both
    *  states and settings in one pass. */
   async saveSettings(): Promise<void> {
+    await this.rebuildIndex();
+  }
+
+  /** Wipes all scheduling history vault-wide. rebuildIndex() then repopulates
+   *  a fresh initialState() for every currently-known card via the same
+   *  reconcile path as any other reindex, and persists. Gated behind
+   *  ConfirmResetModal in the settings tab -- irreversible. */
+  async resetAllProgress(): Promise<void> {
+    this.states = {};
     await this.rebuildIndex();
   }
 }
@@ -376,6 +393,16 @@ class DecksView extends ItemView {
 
   async onOpen() {
     this.render();
+    this.addAction("refresh-cw", "Refresh", () => this.render());
+    // A tab that was already open doesn't otherwise learn that
+    // plugin.states/cardCache changed in the background (e.g. a note was
+    // edited while this tab wasn't focused) -- refresh whenever it becomes
+    // the active leaf again.
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", (leaf) => {
+        if (leaf === this.leaf) this.render();
+      }),
+    );
   }
 
   private render = () => {
@@ -407,6 +434,32 @@ class DecksView extends ItemView {
         .onClick(() => this.plugin.startReview(node.path, this.render));
       if (node.children.length) this.renderNodes(container, node.children, depth + 1);
     }
+  }
+}
+
+/** Second confirmation hurdle before wiping every card's scheduling
+ *  history -- deliberately not a one-click action from the settings tab. */
+class ConfirmResetModal extends Modal {
+  constructor(app: App, private onConfirm: () => void) {
+    super(app);
+  }
+
+  onOpen() {
+    this.titleEl.setText("Reset all learning progress?");
+    this.contentEl.createEl("p", {
+      text:
+        "This permanently deletes scheduling history (ease, interval, " +
+        "review log) for every card in your vault. This cannot be undone.",
+    });
+    const row = this.contentEl.createDiv({ cls: "flowcards-confirm-row" });
+    new ButtonComponent(row).setButtonText("Cancel").onClick(() => this.close());
+    new ButtonComponent(row)
+      .setButtonText("Reset everything")
+      .setWarning()
+      .onClick(() => {
+        this.close();
+        this.onConfirm();
+      });
   }
 }
 
@@ -481,6 +534,22 @@ class FlowcardsSettingTab extends PluginSettingTab {
           .onChange((v) => {
             this.plugin.settings.cloze.scope = v as ClozeScope;
             this.dirty = true;
+          }),
+      );
+
+    containerEl.createEl("h3", { text: "Danger zone" });
+    new Setting(containerEl)
+      .setName("Reset all learning progress")
+      .setDesc("Deletes every card's scheduling history and starts fresh. This cannot be undone.")
+      .addButton((btn) =>
+        btn
+          .setButtonText("Reset everything")
+          .setWarning()
+          .onClick(() => {
+            new ConfirmResetModal(this.app, async () => {
+              await this.plugin.resetAllProgress();
+              new Notice("Flowcards: all learning progress has been reset.");
+            }).open();
           }),
       );
   }
