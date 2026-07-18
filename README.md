@@ -154,11 +154,14 @@ won't immediately be asked the same fact twice from opposite directions.
 ### The deck overview
 
 Click the graduation-cap icon in the ribbon (or run **Open deck
-overview**) to open a page listing every deck and subdeck with its
-**due/total** card count. Click a deck to start a review scoped to just
-that one. The page keeps itself current — new or edited cards, and the
-counts after a review session, show up without reopening the tab — but a
-refresh button is there too if you want to force it.
+overview**) to open a page listing every deck and subdeck. Each row shows
+its due cards broken down by how you last rated them — colored **Again /
+Hard / Good / Easy** badges, plus **New** for due cards you haven't
+reviewed yet — followed by the deck's total card count. Click a deck to
+start a review scoped to just that one. The page keeps itself current —
+new or edited cards, and the counts after a review session, show up
+without reopening the tab — but a refresh button is there too if you want
+to force it.
 
 The overview opens as a normal tab, so it stays around, and you can link
 to it from any other note (e.g. your daily note) with a plain Markdown

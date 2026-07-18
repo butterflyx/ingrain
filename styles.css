@@ -31,12 +31,43 @@
 
 .flowcards-deck-row {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4em;
   margin-top: 0.25em;
 }
 
-.flowcards-deck-row button {
-  width: 100%;
-  text-align: left;
+.flowcards-rating-badge {
+  padding: 0.05em 0.5em;
+  border-radius: 0.75em;
+  font-size: 0.8em;
+  color: var(--text-on-accent);
+}
+
+.flowcards-rating-again {
+  background: var(--color-red);
+}
+
+.flowcards-rating-hard {
+  background: var(--color-orange);
+}
+
+.flowcards-rating-good {
+  background: var(--color-blue);
+}
+
+.flowcards-rating-easy {
+  background: var(--color-green);
+}
+
+.flowcards-rating-new {
+  background: var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+.flowcards-deck-total {
+  font-size: 0.8em;
+  color: var(--text-muted);
 }
 
 .flowcards-confirm-row {

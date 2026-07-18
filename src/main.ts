@@ -41,7 +41,7 @@ import {
   startSession,
 } from "./review";
 import { coordinateSiblingDue } from "./scheduler";
-import { DeckNode, buildDeckTree, filterByDeck } from "./decks";
+import { DeckNode, RatingBreakdown, buildDeckTree, filterByDeck } from "./decks";
 
 // This is the ONLY file that touches the Obsidian API. It stays thin on
 // purpose: parse + reconcile + schedule + the review session state machine
@@ -458,10 +458,30 @@ class DecksView extends ItemView {
       const row = container.createDiv({ cls: "flowcards-deck-row" });
       row.style.paddingLeft = `${depth * 1.25}em`;
       new ButtonComponent(row)
-        .setButtonText(`${node.name} (${node.dueCount}/${node.totalCount})`)
+        .setButtonText(node.name)
         .onClick(() => this.plugin.startReview(node.path, this.render));
+      this.renderBreakdown(row, node.dueByRating, node.totalCount);
       if (node.children.length) this.renderNodes(container, node.children, depth + 1);
     }
+  }
+
+  /** Colored again/hard/good/easy/new badges for the due cards in this
+   *  deck, followed by the total card count. Replaces a plain "(due/total)"
+   *  text label -- categories with zero cards are skipped entirely. */
+  private renderBreakdown(container: HTMLElement, breakdown: RatingBreakdown, total: number) {
+    const parts: [keyof RatingBreakdown, string, string][] = [
+      ["again", "Again", "flowcards-rating-again"],
+      ["hard", "Hard", "flowcards-rating-hard"],
+      ["good", "Good", "flowcards-rating-good"],
+      ["easy", "Easy", "flowcards-rating-easy"],
+      ["new", "New", "flowcards-rating-new"],
+    ];
+    for (const [key, label, cls] of parts) {
+      const count = breakdown[key];
+      if (count === 0) continue;
+      container.createSpan({ cls: ["flowcards-rating-badge", cls], text: `${label} ${count}` });
+    }
+    container.createSpan({ cls: "flowcards-deck-total", text: `| ${total}` });
   }
 }
 
