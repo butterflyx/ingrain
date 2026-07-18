@@ -143,6 +143,34 @@ describe("parseNote — callouts", () => {
   });
 });
 
+describe("per-callout deck-tag override", () => {
+  it("a callout's own inline tag overrides the note-level deck", () => {
+    const md = `#flashcards/general\n\n> [!card] Term\n> #flashcards/specific Definition`;
+    const cards = parseNote(md, "n.md", S);
+    expect(cards[0].decks).toEqual(["flashcards/specific"]);
+    expect(cards[0].deck).toBe("flashcards/specific");
+  });
+
+  it("a callout without its own tag falls back to the note-level decks", () => {
+    const md = `#flashcards/general\n\n> [!card] Term\n> Definition`;
+    const cards = parseNote(md, "n.md", S);
+    expect(cards[0].decks).toEqual(["flashcards/general"]);
+  });
+
+  it("a cloze inside an overridden callout also uses the local deck", () => {
+    const md = `#flashcards/general\n\n> [!card] #flashcards/specific Chem\n> The ==physical== layer moves ==bits==`;
+    const cards = parseNote(md, "n.md", S);
+    expect(cards.every((c) => c.decks[0] === "flashcards/specific")).toBe(true);
+  });
+
+  it("a callout with two of its own tags carries both, first one for display", () => {
+    const md = `#flashcards/general\n\n> [!card] Term\n> #flashcards/a #flashcards/b Definition`;
+    const cards = parseNote(md, "n.md", S);
+    expect(cards[0].decks).toEqual(["flashcards/a", "flashcards/b"]);
+    expect(cards[0].deck).toBe("flashcards/a");
+  });
+});
+
 describe("configurable callout type", () => {
   it("a non-matching callout type produces no card at default settings", () => {
     const md = `#flashcards\n\n> [!note] Term\n> Definition`;

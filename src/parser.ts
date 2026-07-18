@@ -231,11 +231,17 @@ function calloutCards(
   notePath: string,
   settings: FlowcardsSettings,
 ): Omit<Card, "context">[] {
+  // A callout can carry its own deck tag(s), overriding the note-level
+  // decks just for cards produced from it — same "first tag(s) win"
+  // resolution as extractDecks(), applied locally to the callout text.
+  const localTags = findDeckTags(c.title + "\n" + c.body, settings);
+  const effectiveDecks = localTags.size ? [...localTags] : decks;
+
   // If the body carries clozes, it's a cloze card, not Q&A. Seq-grouping is
   // allowed here: c is already a callout of the configured type (see
   // findCallouts()), so this is exactly the "explicit card container" the
   // seq feature is scoped to.
-  const inner = clozeCards(c.body, decks, notePath, settings, true);
+  const inner = clozeCards(c.body, effectiveDecks, notePath, settings, true);
   if (inner.length) return inner;
 
   const reverse = c.title.includes(settings.reverseEmoji) || c.body.includes(settings.reverseEmoji);
@@ -249,8 +255,8 @@ function calloutCards(
     {
       hash: forwardHash,
       notePath,
-      deck: decks[0],
-      decks,
+      deck: effectiveDecks[0],
+      decks: effectiveDecks,
       kind: "callout-qa",
       front,
       back,
@@ -263,8 +269,8 @@ function calloutCards(
     cards.push({
       hash: reverseHash,
       notePath,
-      deck: decks[0],
-      decks,
+      deck: effectiveDecks[0],
+      decks: effectiveDecks,
       kind: "callout-qa",
       front: back,
       back: front,
