@@ -21,9 +21,9 @@ of scope for per-card stats).
   transition/count to `review.ts`/`decks.ts`). No parsing/scheduling/
   session logic here.
 - `src/parser.ts`, `src/scheduler.ts`, `src/reconcile.ts`, `src/review.ts`,
-  `src/decks.ts`, `src/reminder.ts`, `src/hash.ts`, `src/types.ts` — PURE.
-  Never import "obsidian". This is where the real work lives and where all
-  tests point.
+  `src/decks.ts`, `src/reminder.ts`, `src/i18n.ts`, `src/hash.ts`,
+  `src/types.ts` — PURE. Never import "obsidian". This is where the real
+  work lives and where all tests point.
   You can iterate here fully headless.
 
 When adding behaviour: write the vitest test in `src/__tests__/` first, then
@@ -85,8 +85,11 @@ implement in the pure module. Only wire it into `main.ts` once tests are green.
 | Deck overview page + deck-scoped review | done | `main.ts` `DecksView`, `decks.ts` `buildDeckTree`/`filterByDeck`; linkable via `obsidian://flowcards-decks`; refreshes via `FlowcardsPlugin.notifyDecksChanged()` (pushed on every state change) + `active-leaf-change` + a manual refresh action |
 | New notes indexed on creation | done | `main.ts` `vault.on("create", ...)`, same path as `modify` |
 | Reset all learning progress | done | `main.ts` `FlowcardsPlugin.resetAllProgress()`, `ConfirmResetModal`, settings-tab "Danger zone" |
-| DecksView rating breakdown | done | `decks.ts` `DeckNode.dueByRating`/`classify()`, `main.ts` `DecksView.renderBreakdown()` — colored Again/Hard/Good/Easy/New badges + total, replaces the old due/total label. Scoped to currently-due cards, by design (confirmed with user after live-testing raised it) — since `scheduler.ts` gives every rating a minimum 1-day interval, a card rated today always leaves the due set until at least tomorrow, so Again/Hard/Good/Easy can only show counts for cards rated on a *previous* day that are due again now. Same-day testing will only ever show "New" until the vault has multi-day history. Not a bug. |
+| DecksView rating breakdown | done | `decks.ts` `DeckNode.dueByRating`/`classify()`, `main.ts` `DecksView.renderBreakdown()` — colored Again/Hard/Good/Easy/New badges + total, replaces the old due/total label. Scoped to currently-due cards, by design (confirmed with user after live-testing raised it) — since `scheduler.ts` gives every rating a minimum 1-day interval, a card rated today always leaves the due set until at least tomorrow, so Again/Hard/Good/Easy can only show counts for cards rated on a *previous* day that are due again now. Same-day testing will only ever show "New" until the vault has multi-day history. Not a bug. A deck with zero due cards in every category shows an explicit "–" placeholder instead of a bare `\| N`. |
 | Time-based review reminder | done | `reminder.ts` `shouldShowReminder`/`lastReviewedAt`, `main.ts` `checkReminder()` (hourly `registerInterval` + on-load check) — configurable via `FlowcardsSettings.reminderIntervalDays` (0 = disabled), Notice clickable to the deck overview, throttled to once/day |
+| Card callout default styling | done | `styles.css` `.callout[data-callout="card"]` — icon + light background (`var(--background-secondary)`) for the default `calloutType`. Static rule, so it stops applying if `calloutType` is changed in settings (documented in README). |
+| Insert card skeleton command | done | `main.ts` `insert-card-skeleton` command, `editorCallback`, reads the configured `calloutType` |
+| Full-plugin i18n (English/German) | done | `i18n.ts` `t(locale, key, vars?)`, flat en/de dictionary, `{placeholder}` interpolation, English fallback for unknown locale/key. `FlowcardsPlugin.locale` read once from `moment.locale()` at `onload()`. Covers every visible string (commands, ribbon, Notices, ReviewModal, DecksView, ConfirmResetModal, settings tab) except the numeric `(1)`-`(4)` rating-button suffixes. |
 | Configurable cloze pattern (custom regex) | dropped | user doesn't need this — highlight/bold toggle stays the permanent design |
 | Bases note-aggregate export | dropped | user doesn't need this — store-only stays the permanent design |
 
@@ -113,10 +116,23 @@ ordering/grouping history plus what's still open.
   while Obsidian was closed), gated on due cards existing and
   `reminderIntervalDays` since the last actual review, throttled to
   once/day. See Implementation status above.
-- **M8 (not started): polish & convenience (P:3).** Default CSS icon for
-  card callouts; translate the settings tab (starting with German); a
-  command to insert a card-callout skeleton at the cursor.
+- **M8 (done): polish & convenience.** DecksView "–" placeholder for a
+  deck with zero due cards (triaged in from Raw ideas, P:2); default CSS
+  icon + light background for card callouts; a command to insert a
+  card-callout skeleton at the cursor; every visible plugin string made
+  translatable, starting with German (expanded from the original
+  settings-tab-only scope per user correction).
 - Explicitly NOT in v1: reviewing whole notes.
+
+## Before v1.0.0 release
+
+Non-code deliverables that still need to happen before the version gets
+fixed at v1.0.0 — not implementation, so not part of the M-numbered list
+above.
+
+- **Elevator pitch (P:1).** Write a short pitch for the plugin so the
+  name "flowcards" can be challenged one more time before the release
+  locks it in. Purely a writing task, no files/implementation involved.
 
 ## Post-v1 (v2.0.0, deliberately deferred)
 
@@ -146,5 +162,4 @@ proper milestone bullet (what changes, which files), and remove it from
 this list. Don't triage on your own initiative — wait to be asked, since
 priority here is the user's call, not yours.
 
-- edge case in DecksView: wenn alle Karten gelernt (no due) aber noch keine Fälligkeit von weiteren Karten wird "| N" angezeigt. Besser wäre "- | N" um zu signalisieren, dass es derzeit keine due-Karten gibt. (P:2) 
-- schreibe mir einer Elvator Pitch für das Plugin. Ich möchte es nutzen, um den Namen "flowcards" nochmal zu challengen bevor ich v.1.0.0 veröffentliche und es damit fixiere. (P:1)
+(none right now)

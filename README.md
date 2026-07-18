@@ -79,6 +79,17 @@ callouts of the configured type (`card` by default — change it in settings)
 are turned into cards, so you can freely use `[!note]`, `[!warning]`, etc.
 for regular annotations without them becoming flashcards.
 
+Run **Insert card skeleton** from the command palette to drop a blank
+`> [!card] ` block at the cursor, using whatever callout type is
+currently configured.
+
+Flowcards ships a default look for `[!card]` callouts — a graduation-cap
+icon and a light background — so they stand out from your other callout
+types at a glance. This styling is tied to the default callout type name;
+if you change **Callout type** in settings to something else, the CSS no
+longer applies automatically (add your own CSS snippet targeting
+`.callout[data-callout="yourtype"]` if you want the same look).
+
 Add the reverse emoji (🔁 by default) to also generate the reverse card:
 
 ```markdown
@@ -197,6 +208,14 @@ palette to force a full rescan.
 A **Danger zone** at the bottom has a "Reset everything" button that
 permanently deletes all scheduling history and starts every card fresh —
 behind a confirmation dialog, since it can't be undone.
+
+## Language
+
+The plugin's own UI (commands, ribbon tooltip, the review modal, the deck
+overview, and this settings tab) follows Obsidian's own language setting
+(**Settings → General → Language**) — currently English and German.
+Switching it takes effect after Obsidian reloads. Any other language
+falls back to English.
 
 ## Current limitations
 
