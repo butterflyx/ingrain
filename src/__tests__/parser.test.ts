@@ -184,6 +184,32 @@ describe("cloze seq-grouping (callout-only)", () => {
   });
 });
 
+describe("card context (nearest heading)", () => {
+  it("a card under a heading gets that heading as context", () => {
+    const md = `#flashcards\n\n## Cell biology\n\n> [!card] Term\n> Definition`;
+    const cards = parseNote(md, "n.md", S);
+    expect(cards[0].context).toBe("Cell biology");
+  });
+
+  it("a card with no heading anywhere falls back to the note's filename", () => {
+    const md = `#flashcards\n\n> [!card] Term\n> Definition`;
+    const cards = parseNote(md, "folder/My Note.md", S);
+    expect(cards[0].context).toBe("My Note");
+  });
+
+  it("a card under the second of two headings gets the nearer one", () => {
+    const md = `#flashcards\n\n## First\n\nSome text.\n\n## Second\n\n> [!card] Term\n> Definition`;
+    const cards = parseNote(md, "n.md", S);
+    expect(cards[0].context).toBe("Second");
+  });
+
+  it("works for cloze cards outside a callout too", () => {
+    const md = `#flashcards\n\n## Geography\n\nThe capital of France is ==Paris==.`;
+    const cards = parseNote(md, "n.md", S);
+    expect(cards[0].context).toBe("Geography");
+  });
+});
+
 describe("parseNote — inline clozes", () => {
   it("produces one sibling card per cloze, back reveals all", () => {
     const md = `#flashcards\n\nThe ==physical== layer moves ==bits==.`;

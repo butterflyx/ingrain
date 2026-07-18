@@ -157,7 +157,7 @@ function clozeCards(
   notePath: string,
   settings: FlowcardsSettings,
   allowSeq: boolean,
-): Card[] {
+): Omit<Card, "context">[] {
   const clozes = extractClozes(block, settings, allowSeq);
   if (!clozes.length) return [];
   const back = renderCloze(block, clozes, null);
@@ -213,7 +213,12 @@ export function findCallouts(body: string, settings: FlowcardsSettings): Callout
   return callouts;
 }
 
-function calloutCards(c: Callout, deck: string, notePath: string, settings: FlowcardsSettings): Card[] {
+function calloutCards(
+  c: Callout,
+  deck: string,
+  notePath: string,
+  settings: FlowcardsSettings,
+): Omit<Card, "context">[] {
   // If the body carries clozes, it's a cloze card, not Q&A. Seq-grouping is
   // allowed here: c is already a callout of the configured type (see
   // findCallouts()), so this is exactly the "explicit card container" the
@@ -226,7 +231,7 @@ function calloutCards(c: Callout, deck: string, notePath: string, settings: Flow
   const front = strip(c.title);
   const back = strip(c.body);
 
-  const cards: Card[] = [
+  const cards: Omit<Card, "context">[] = [
     {
       hash: cardHash(c.title + "\n" + c.body, "qa"),
       notePath,
@@ -253,6 +258,30 @@ function calloutCards(c: Callout, deck: string, notePath: string, settings: Flow
   return cards;
 }
 
+interface Heading {
+  offset: number;
+  text: string;
+}
+
+/** Collect every Markdown heading (any level) in the body, in document order. */
+function findHeadings(body: string): Heading[] {
+  return [...body.matchAll(/^#{1,6}\s+(.+)$/gm)].map((m) => ({
+    offset: m.index!,
+    text: m[1].trim(),
+  }));
+}
+
+/** The last heading at or before `offset`, or null if none precedes it.
+ *  `headings` must be in ascending offset order (findHeadings() guarantees this). */
+function nearestHeading(headings: Heading[], offset: number): string | null {
+  let best: string | null = null;
+  for (const h of headings) {
+    if (h.offset <= offset) best = h.text;
+    else break;
+  }
+  return best;
+}
+
 /** Top-level entry point. */
 export function parseNote(md: string, notePath: string, settings: FlowcardsSettings): Card[] {
   if (!hasDeckTag(md, settings)) return [];
@@ -260,8 +289,19 @@ export function parseNote(md: string, notePath: string, settings: FlowcardsSetti
   const { body } = splitFrontmatter(md);
   const cards: Card[] = [];
 
+  const headings = findHeadings(body);
+  const noteName = notePath.split("/").pop()!.replace(/\.md$/, "");
+  const contextFor = (source: string): string => {
+    const offset = body.indexOf(source);
+    const heading = offset === -1 ? null : nearestHeading(headings, offset);
+    return heading ?? noteName;
+  };
+
   const callouts = findCallouts(body, settings);
-  for (const c of callouts) cards.push(...calloutCards(c, deck, notePath, settings));
+  for (const c of callouts) {
+    const context = contextFor(c.raw);
+    for (const card of calloutCards(c, deck, notePath, settings)) cards.push({ ...card, context });
+  }
 
   // Clozes outside callouts: split remaining text into blank-line blocks,
   // skip anything that was inside a callout, keep blocks that contain clozes.
@@ -274,9 +314,13 @@ export function parseNote(md: string, notePath: string, settings: FlowcardsSetti
     const calloutRaw = new Set(callouts.map((c) => c.raw));
     const blocks = body.split(/\n\s*\n/);
     for (const block of blocks) {
-      if ([...calloutRaw].some((raw) => raw.includes(block.trim()) && block.trim())) continue;
-      if (/^>\s*\[!/.test(block.trim())) continue;
-      cards.push(...clozeCards(block.trim(), deck, notePath, settings, false));
+      const trimmed = block.trim();
+      if ([...calloutRaw].some((raw) => raw.includes(trimmed) && trimmed)) continue;
+      if (/^>\s*\[!/.test(trimmed)) continue;
+      const context = contextFor(trimmed);
+      for (const card of clozeCards(trimmed, deck, notePath, settings, false)) {
+        cards.push({ ...card, context });
+      }
     }
   }
 

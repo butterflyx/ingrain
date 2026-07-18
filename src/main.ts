@@ -256,6 +256,8 @@ class ReviewModal extends Modal {
 
     this.titleEl.setText(`${card.deck} — ${progress.reviewed + 1} of ${progress.total}`);
 
+    this.contentEl.createDiv({ cls: "flowcards-context", text: card.context });
+
     const frontEl = this.contentEl.createDiv({ cls: "flowcards-front" });
     void MarkdownRenderer.render(this.app, card.front, frontEl, card.notePath, this.mdComponent);
 

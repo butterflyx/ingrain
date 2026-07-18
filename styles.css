@@ -1,3 +1,9 @@
+.flowcards-context {
+  font-size: 0.8em;
+  color: var(--text-faint);
+  margin-bottom: 0.5em;
+}
+
 .flowcards-front {
   font-size: 1.1em;
   margin-bottom: 1em;

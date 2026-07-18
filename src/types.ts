@@ -33,6 +33,9 @@ export interface Card {
   seq?: string;
   /** Raw source block the card was derived from. Basis for hashing + locating. */
   sourceBlock: string;
+  /** Nearest heading above this card's source block, for context at review
+   *  time. Falls back to the note's filename when no heading precedes it. */
+  context: string;
 }
 
 export interface ReviewEntry {

@@ -12,6 +12,7 @@ function card(hash: string, notePath: string): Card {
     back: "b",
     reverse: false,
     sourceBlock: "src",
+    context: "note",
   };
 }
 
