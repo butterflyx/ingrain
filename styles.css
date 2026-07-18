@@ -81,3 +81,13 @@
   margin-top: 1em;
   justify-content: flex-end;
 }
+
+/* Default look for the plugin's own card callouts -- ties the icon and a
+   light background to the default calloutType ("card"). Static rule: if the
+   Callout type setting is changed to something else, this no longer applies
+   automatically (see README "Current limitations"). */
+.callout[data-callout="card"] {
+  --callout-icon: lucide-graduation-cap;
+  --callout-color: 128, 128, 128;
+  background-color: var(--background-secondary);
+}
