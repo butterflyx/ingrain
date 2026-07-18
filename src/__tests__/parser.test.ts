@@ -364,4 +364,63 @@ describe("cloze tables inside callouts (investigative — fix only if broken)", 
     expect(cards[0].front.split("\n")).toHaveLength(3);
     expect(cards[0].back).toContain("A\\|B");
   });
+
+  it("a bold table header is never recognized as a cloze -- only data-cell clozes become cards", () => {
+    // Reproduces the exact dev-vault case (Netzwerke.md, "OSI Layer"):
+    // bold header cells used purely for table styling, real clozes below.
+    const md = [
+      "#flashcards",
+      "",
+      "> [!card] OSI Layer",
+      "> | **Layer** | **Abk** |",
+      "> | --------- | ------- |",
+      "> | ==1==[^1] | ==P==[^2] |",
+      "> | 2 | D |",
+    ].join("\n");
+    const cards = parseNote(md, "n.md", S);
+    // Only "1" (its own group) and "P" (its own group, no shared seq here)
+    // -> 2 cards. None of them come from "Layer"/"Abk".
+    expect(cards).toHaveLength(2);
+    for (const card of cards) {
+      // Header keeps its raw **Layer**/**Abk** markup (renders as bold
+      // visually) rather than being blanked or marker-stripped.
+      expect(card.back).toContain("**Layer**");
+      expect(card.back).toContain("**Abk**");
+    }
+  });
+
+  it("a highlighted table header is also never recognized as a cloze", () => {
+    const md = [
+      "#flashcards",
+      "",
+      "> [!card] Table",
+      "> | ==Name== | Value |",
+      "> | --- | --- |",
+      "> | Answer | ==42== |",
+    ].join("\n");
+    const cards = parseNote(md, "n.md", S);
+    expect(cards).toHaveLength(1);
+    // Header keeps its raw ==Name== markup (renders as highlight visually,
+    // via MarkdownRenderer) rather than being blanked or marker-stripped.
+    expect(cards[0].front).toContain("==Name==");
+    expect(cards[0].back).toContain("42");
+  });
+
+  it("a bold table header outside a callout is also excluded", () => {
+    const md = [
+      "#flashcards",
+      "",
+      "| **Name** | Value |",
+      "| --- | --- |",
+      "| Answer | ==42== |",
+    ].join("\n");
+    const cards = parseNote(md, "n.md", S);
+    expect(cards).toHaveLength(1);
+    expect(cards[0].back).toContain("**Name**");
+  });
+
+  it("a cloze in normal prose (no table) is unaffected by the header filter", () => {
+    const md = `#flashcards\n\nThe ==physical== layer moves ==bits==.`;
+    expect(parseNote(md, "n.md", S)).toHaveLength(2);
+  });
 });

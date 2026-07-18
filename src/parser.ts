@@ -80,6 +80,29 @@ export function hasDeckTag(md: string, settings: FlowcardsSettings): boolean {
   return findDeckTags(md, settings).size > 0;
 }
 
+/** Character ranges [start, end) of Markdown table header lines within
+ *  `text` — the row immediately before a GFM separator line
+ *  (`| --- | --- |`, optionally with `:` alignment markers). Clozes are
+ *  never recognized there, so header cells can use bold/highlight purely
+ *  for table styling without becoming spurious cards. */
+function tableHeaderRanges(text: string): [number, number][] {
+  const isSeparatorLine = (line: string) => /^[\s|:-]+$/.test(line) && line.includes("-");
+  const ranges: [number, number][] = [];
+  const lines = text.split("\n");
+  const starts: number[] = [];
+  let offset = 0;
+  for (const line of lines) {
+    starts.push(offset);
+    offset += line.length + 1; // +1 for the split-out "\n"
+  }
+  for (let i = 1; i < lines.length; i++) {
+    if (isSeparatorLine(lines[i]) && lines[i - 1].includes("|")) {
+      ranges.push([starts[i - 1], starts[i - 1] + lines[i - 1].length]);
+    }
+  }
+  return ranges;
+}
+
 /**
  * Find `==answer==` / `**answer**` clozes with an optional ^[hint].
  *
@@ -89,6 +112,11 @@ export function hasDeckTag(md: string, settings: FlowcardsSettings): boolean {
  * consumed) to avoid mangling real footnotes or colliding with other
  * plugins that process them. Callers control this per call site; see
  * clozeCards().
+ *
+ * Matches inside a Markdown table HEADER row (see tableHeaderRanges()) are
+ * dropped regardless of marker style — bold/highlighted header cells are
+ * table styling, not quiz content (dev-vault repro: a "**Layer**" header
+ * cell was silently becoming its own cloze card).
  */
 export function extractClozes(text: string, settings: FlowcardsSettings, allowSeq: boolean): ClozeMatch[] {
   const patterns: RegExp[] = [];
@@ -119,7 +147,9 @@ export function extractClozes(text: string, settings: FlowcardsSettings, allowSe
       });
     }
   }
-  return found.sort((a, b) => a.start - b.start);
+  const headerRanges = tableHeaderRanges(text);
+  const inHeader = (start: number) => headerRanges.some(([s, e]) => start >= s && start < e);
+  return found.filter((c) => !inHeader(c.start)).sort((a, b) => a.start - b.start);
 }
 
 /** Render a block with a set of target clozes blanked and the rest revealed.
