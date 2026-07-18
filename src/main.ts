@@ -168,10 +168,15 @@ export default class FlowcardsPlugin extends Plugin {
     await this.saveData(data);
   }
 
-  /** Persist settings-tab edits. Public so FlowcardsSettingTab can call it
-   *  without exposing the general-purpose save() beyond this file. */
+  /** Persist settings-tab edits AND reindex the vault with them, so a
+   *  changed calloutType/deckTagRoot/etc. takes effect without a manual
+   *  "Rebuild index". Called once when the settings tab is closed (see
+   *  FlowcardsSettingTab.hide()), not per keystroke -- rebuildIndex()
+   *  reads every markdown file, too expensive to run on every onChange.
+   *  rebuildIndex() already calls save() at the end, persisting both
+   *  states and settings in one pass. */
   async saveSettings(): Promise<void> {
-    await this.save();
+    await this.rebuildIndex();
   }
 }
 
@@ -299,6 +304,8 @@ class ReviewModal extends Modal {
 }
 
 class FlowcardsSettingTab extends PluginSettingTab {
+  private dirty = false;
+
   constructor(app: App, private plugin: FlowcardsPlugin) {
     super(app, plugin);
   }
@@ -306,14 +313,15 @@ class FlowcardsSettingTab extends PluginSettingTab {
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
+    this.dirty = false;
 
     new Setting(containerEl)
       .setName("Deck tag root")
       .setDesc("Tag prefix that marks notes containing cards, e.g. flashcards")
       .addText((t) =>
-        t.setValue(this.plugin.settings.deckTagRoot).onChange(async (v) => {
+        t.setValue(this.plugin.settings.deckTagRoot).onChange((v) => {
           this.plugin.settings.deckTagRoot = v.trim();
-          await this.plugin.saveSettings();
+          this.dirty = true;
         }),
       );
 
@@ -321,9 +329,9 @@ class FlowcardsSettingTab extends PluginSettingTab {
       .setName("Reverse emoji")
       .setDesc("Marks a Q&A card as reversible")
       .addText((t) =>
-        t.setValue(this.plugin.settings.reverseEmoji).onChange(async (v) => {
+        t.setValue(this.plugin.settings.reverseEmoji).onChange((v) => {
           this.plugin.settings.reverseEmoji = v.trim();
-          await this.plugin.saveSettings();
+          this.dirty = true;
         }),
       );
 
@@ -331,23 +339,23 @@ class FlowcardsSettingTab extends PluginSettingTab {
       .setName("Callout type")
       .setDesc("Only callouts of this type (e.g. [!card]) become cards")
       .addText((t) =>
-        t.setValue(this.plugin.settings.calloutType).onChange(async (v) => {
+        t.setValue(this.plugin.settings.calloutType).onChange((v) => {
           this.plugin.settings.calloutType = v.trim();
-          await this.plugin.saveSettings();
+          this.dirty = true;
         }),
       );
 
     new Setting(containerEl).setName("Cloze: highlight (==...==)").addToggle((tg) =>
-      tg.setValue(this.plugin.settings.cloze.highlight).onChange(async (v) => {
+      tg.setValue(this.plugin.settings.cloze.highlight).onChange((v) => {
         this.plugin.settings.cloze.highlight = v;
-        await this.plugin.saveSettings();
+        this.dirty = true;
       }),
     );
 
     new Setting(containerEl).setName("Cloze: bold (**...**)").addToggle((tg) =>
-      tg.setValue(this.plugin.settings.cloze.bold).onChange(async (v) => {
+      tg.setValue(this.plugin.settings.cloze.bold).onChange((v) => {
         this.plugin.settings.cloze.bold = v;
-        await this.plugin.saveSettings();
+        this.dirty = true;
       }),
     );
 
@@ -363,10 +371,17 @@ class FlowcardsSettingTab extends PluginSettingTab {
           .addOption("anywhere", "Whole note")
           .addOption("callout-only", "Inside callouts only")
           .setValue(this.plugin.settings.cloze.scope)
-          .onChange(async (v) => {
+          .onChange((v) => {
             this.plugin.settings.cloze.scope = v as ClozeScope;
-            await this.plugin.saveSettings();
+            this.dirty = true;
           }),
       );
+  }
+
+  /** Fires when the user navigates away from this settings tab. Persist +
+   *  reindex exactly once here rather than per keystroke/click — see
+   *  FlowcardsPlugin.saveSettings(). No-op if nothing actually changed. */
+  hide(): void {
+    if (this.dirty) void this.plugin.saveSettings();
   }
 }
