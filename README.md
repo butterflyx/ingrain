@@ -68,8 +68,10 @@ cards under `spanish/verbs`.
 > Paris
 ```
 
-The callout title becomes the front, the body becomes the back. The callout
-type (`card` above) can be anything you like.
+The callout title becomes the front, the body becomes the back. Only
+callouts of the configured type (`card` by default — change it in settings)
+are turned into cards, so you can freely use `[!note]`, `[!warning]`, etc.
+for regular annotations without them becoming flashcards.
 
 Add the reverse emoji (🔁 by default) to also generate the reverse card:
 
@@ -124,6 +126,7 @@ rate "Again" comes back soon, "Easy" pushes it further out.
 | --- | --- |
 | Deck tag root | The tag prefix that marks a note as containing cards (default `flashcards`). |
 | Reverse emoji | Marks a callout card as reversible (default 🔁). |
+| Callout type | Only callouts of this type become cards (default `card`). Other callout types are left alone. |
 | Cloze: highlight / bold | Turn `==...==` and/or `**...**` recognition on or off independently. |
 | Cloze scope | **Whole note** (default): highlighted/bold text anywhere counts. **Inside callouts only**: loose highlights elsewhere in the note are ignored — callouts are unaffected either way. |
 

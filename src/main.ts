@@ -315,6 +315,15 @@ class FlowcardsSettingTab extends PluginSettingTab {
         }),
       );
 
+    new Setting(containerEl)
+      .setName("Callout type")
+      .setDesc("Only callouts of this type (e.g. [!card]) become cards")
+      .addText((t) =>
+        t.setValue(this.plugin.settings.calloutType).onChange(async (v) => {
+          this.plugin.settings.calloutType = v.trim();
+        }),
+      );
+
     new Setting(containerEl).setName("Cloze: highlight (==...==)").addToggle((tg) =>
       tg.setValue(this.plugin.settings.cloze.highlight).onChange((v) => {
         this.plugin.settings.cloze.highlight = v;

@@ -77,6 +77,27 @@ describe("parseNote — callouts", () => {
   });
 });
 
+describe("configurable callout type", () => {
+  it("a non-matching callout type produces no card at default settings", () => {
+    const md = `#flashcards\n\n> [!note] Term\n> Definition`;
+    expect(parseNote(md, "n.md", S)).toEqual([]);
+  });
+
+  it("a custom callout type is recognized, and the old default is ignored", () => {
+    const CUSTOM = { ...S, calloutType: "flashcard" };
+    const md = `#flashcards\n\n> [!flashcard] Term\n> Definition\n\n> [!card] Ignored\n> Ignored`;
+    const cards = parseNote(md, "n.md", CUSTOM);
+    expect(cards).toHaveLength(1);
+    expect(cards[0].front).toBe("Term");
+  });
+
+  it("type matching is case-insensitive", () => {
+    const md = `#flashcards\n\n> [!CARD] Term\n> Definition`;
+    const cards = parseNote(md, "n.md", S);
+    expect(cards).toHaveLength(1);
+  });
+});
+
 describe("cloze scope setting", () => {
   const CALLOUT_ONLY = { ...S, cloze: { ...S.cloze, scope: "callout-only" as const } };
 

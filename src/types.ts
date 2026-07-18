@@ -79,11 +79,13 @@ export interface ClozeConfig {
 export interface FlowcardsSettings {
   deckTagRoot: string; // tag prefix that marks a note as containing cards, e.g. "flashcards"
   reverseEmoji: string; // marks a card as reversible, e.g. "🔁"
+  calloutType: string; // only callouts of this type (case-insensitive) become cards, e.g. "card"
   cloze: ClozeConfig;
 }
 
 export const DEFAULT_SETTINGS: FlowcardsSettings = {
   deckTagRoot: "flashcards",
   reverseEmoji: "🔁",
+  calloutType: "card",
   cloze: { highlight: true, bold: true, scope: "anywhere" },
 };

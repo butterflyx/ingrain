@@ -133,8 +133,11 @@ interface Callout {
   raw: string;
 }
 
-/** Extract `> [!type] Title` + `> body` callout blocks. */
-export function findCallouts(body: string): Callout[] {
+/** Extract `> [!type] Title` + `> body` callout blocks whose type matches
+ *  settings.calloutType (case-insensitive). Non-matching callout types
+ *  (e.g. [!note], [!warning]) are fully skipped — they never become cards. */
+export function findCallouts(body: string, settings: FlowcardsSettings): Callout[] {
+  const wantedType = settings.calloutType.toLowerCase();
   const lines = body.split("\n");
   const callouts: Callout[] = [];
   let i = 0;
@@ -144,6 +147,7 @@ export function findCallouts(body: string): Callout[] {
       i++;
       continue;
     }
+    const type = head[1].toLowerCase();
     const title = head[2].trim();
     const bodyLines: string[] = [];
     const rawLines = [lines[i]];
@@ -153,7 +157,9 @@ export function findCallouts(body: string): Callout[] {
       bodyLines.push(lines[i].replace(/^>\s?/, ""));
       i++;
     }
-    callouts.push({ title, body: bodyLines.join("\n").trim(), raw: rawLines.join("\n") });
+    if (type === wantedType) {
+      callouts.push({ title, body: bodyLines.join("\n").trim(), raw: rawLines.join("\n") });
+    }
   }
   return callouts;
 }
@@ -202,7 +208,7 @@ export function parseNote(md: string, notePath: string, settings: FlowcardsSetti
   const { body } = splitFrontmatter(md);
   const cards: Card[] = [];
 
-  const callouts = findCallouts(body);
+  const callouts = findCallouts(body, settings);
   for (const c of callouts) cards.push(...calloutCards(c, deck, notePath, settings));
 
   // Clozes outside callouts: split remaining text into blank-line blocks,
