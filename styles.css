@@ -23,3 +23,17 @@
 .flowcards-ratings button {
   flex: 1;
 }
+
+.flowcards-deck-tree {
+  margin-top: 1em;
+}
+
+.flowcards-deck-row {
+  display: flex;
+  margin-top: 0.25em;
+}
+
+.flowcards-deck-row button {
+  width: 100%;
+  text-align: left;
+}

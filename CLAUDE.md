@@ -16,13 +16,14 @@ of scope for per-card stats).
 ## Architecture — respect this boundary
 
 - `src/main.ts` — the ONLY file allowed to import "obsidian". Thin glue:
-  lifecycle, events, commands, settings tab, and the `ReviewModal` class
-  (DOM wiring only — it delegates every state transition to `review.ts`).
-  No parsing/scheduling/session logic here.
+  lifecycle, events, commands, settings tab, and the `ReviewModal`/
+  `DeckPickerModal` classes (DOM wiring only — they delegate every state
+  transition/count to `review.ts`/`decks.ts`). No parsing/scheduling/
+  session logic here.
 - `src/parser.ts`, `src/scheduler.ts`, `src/reconcile.ts`, `src/review.ts`,
-  `src/hash.ts`, `src/types.ts` — PURE. Never import "obsidian". This is where
-  the real work lives and where all tests point. You can iterate here fully
-  headless.
+  `src/decks.ts`, `src/hash.ts`, `src/types.ts` — PURE. Never import
+  "obsidian". This is where the real work lives and where all tests point.
+  You can iterate here fully headless.
 
 When adding behaviour: write the vitest test in `src/__tests__/` first, then
 implement in the pure module. Only wire it into `main.ts` once tests are green.

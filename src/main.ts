@@ -39,6 +39,7 @@ import {
   startSession,
 } from "./review";
 import { coordinateSiblingDue } from "./scheduler";
+import { DeckNode, buildDeckTree, filterByDeck } from "./decks";
 
 // This is the ONLY file that touches the Obsidian API. It stays thin on
 // purpose: parse + reconcile + schedule + the review session state machine
@@ -86,6 +87,12 @@ export default class FlowcardsPlugin extends Plugin {
       callback: () => this.rebuildIndex(),
     });
 
+    this.addCommand({
+      id: "browse-decks",
+      name: "Browse decks to review",
+      callback: () => new DeckPickerModal(this.app, this).open(),
+    });
+
     this.addSettingTab(new FlowcardsSettingTab(this.app, this));
 
     this.addRibbonIcon("layers", "Review due cards", () => this.startReview());
@@ -127,10 +134,10 @@ export default class FlowcardsPlugin extends Plugin {
     await this.save();
   }
 
-  startReview() {
-    const due = dueCards(this.states);
+  startReview(deckPath?: string) {
+    const due = filterByDeck(dueCards(this.states), this.cardCache, deckPath);
     if (!due.length) {
-      new Notice("Flowcards: no cards due.");
+      new Notice(deckPath ? `Flowcards: no cards due in ${deckPath}.` : "Flowcards: no cards due.");
       return;
     }
 
@@ -310,6 +317,56 @@ class ReviewModal extends Modal {
       .setButtonText("Close")
       .setCta()
       .onClick(() => this.close());
+  }
+}
+
+/**
+ * DOM-wiring glue only — counting and deck-tree structure come entirely
+ * from decks.ts (buildDeckTree). Picking a node just calls
+ * plugin.startReview(node.path), which itself delegates filtering to
+ * decks.ts filterByDeck().
+ */
+class DeckPickerModal extends Modal {
+  constructor(app: App, private plugin: FlowcardsPlugin) {
+    super(app);
+  }
+
+  onOpen() {
+    this.render();
+  }
+
+  private render() {
+    this.contentEl.empty();
+    this.titleEl.setText("Review a deck");
+
+    const totalDue = dueCards(this.plugin.states).length;
+    new ButtonComponent(this.contentEl)
+      .setButtonText(`All decks (${totalDue})`)
+      .setCta()
+      .onClick(() => {
+        this.close();
+        this.plugin.startReview();
+      });
+
+    const tree = buildDeckTree(this.plugin.states, this.plugin.cardCache);
+    if (!tree.length) {
+      this.contentEl.createEl("p", { text: "No due cards." });
+      return;
+    }
+    const list = this.contentEl.createDiv({ cls: "flowcards-deck-tree" });
+    this.renderNodes(list, tree, 0);
+  }
+
+  private renderNodes(container: HTMLElement, nodes: DeckNode[], depth: number) {
+    for (const node of nodes) {
+      const row = container.createDiv({ cls: "flowcards-deck-row" });
+      row.style.paddingLeft = `${depth * 1.25}em`;
+      new ButtonComponent(row).setButtonText(`${node.name} (${node.dueCount})`).onClick(() => {
+        this.close();
+        this.plugin.startReview(node.path);
+      });
+      if (node.children.length) this.renderNodes(container, node.children, depth + 1);
+    }
   }
 }
 
