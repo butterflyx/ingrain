@@ -29,6 +29,11 @@ export interface Card {
   front: string;
   back: string;
   reverse: boolean;
+  /** For a reverse Q&A pair: the sibling card's hash. Set on both sides,
+   *  pointing at each other, so reviewing one can push the other's due
+   *  date out (see scheduler.ts coordinateSiblingDue()). Undefined for
+   *  non-reversible callout cards and all cloze cards. */
+  reverseOf?: string;
   /** For cloze cards: 0-based index of this card's cloze GROUP within the
    *  source block (clozes sharing a seq collapse into one group/card). */
   clozeIndex?: number;

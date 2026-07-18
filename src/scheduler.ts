@@ -63,3 +63,11 @@ export function schedule(state: CardState, rating: Rating, now = new Date()): Ca
 export function isDue(state: CardState, now = new Date()): boolean {
   return new Date(state.due).getTime() <= now.getTime();
 }
+
+/** Decide a reverse pair's sibling's new due date after this side was just
+ *  reviewed. v1: mirror the same due timestamp, so the untested side won't
+ *  also show up as due in the same/next session -- its own ease/reps/
+ *  lapses/reviewLog stay untouched, only scheduling timing is coordinated. */
+export function coordinateSiblingDue(sibling: CardState, updatedState: CardState): CardState {
+  return { ...sibling, due: updatedState.due };
+}

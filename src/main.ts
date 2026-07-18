@@ -38,6 +38,7 @@ import {
   sessionProgress,
   startSession,
 } from "./review";
+import { coordinateSiblingDue } from "./scheduler";
 
 // This is the ONLY file that touches the Obsidian API. It stays thin on
 // purpose: parse + reconcile + schedule + the review session state machine
@@ -149,9 +150,15 @@ export default class FlowcardsPlugin extends Plugin {
   }
 
   /** Persist the result of a single review. Write-through (not batched) so
-   *  progress survives an app kill mid-session on mobile. */
-  async recordReview(hash: string, state: CardState): Promise<void> {
-    this.states = { ...this.states, [hash]: state };
+   *  progress survives an app kill mid-session on mobile. If reverseOf
+   *  names a sibling that still exists in the store, its due date is
+   *  coordinated too (see scheduler.ts coordinateSiblingDue()) so it
+   *  won't also show up as due in the same/next session. */
+  async recordReview(hash: string, state: CardState, reverseOf?: string): Promise<void> {
+    let next: StateMap = { ...this.states, [hash]: state };
+    const sibling = reverseOf ? next[reverseOf] : undefined;
+    if (sibling) next = { ...next, [reverseOf!]: coordinateSiblingDue(sibling, state) };
+    this.states = next;
     await this.save();
   }
 
@@ -240,9 +247,10 @@ class ReviewModal extends Modal {
 
   private handleRate(rating: Rating) {
     if (!canRate(this.session)) return;
+    const card = this.cardsByHash.get(currentCard(this.session)!.hash);
     const { session, updatedState } = rate(this.session, rating);
     this.session = session;
-    void this.plugin.recordReview(updatedState.hash, updatedState);
+    void this.plugin.recordReview(updatedState.hash, updatedState, card?.reverseOf);
     this.render();
   }
 

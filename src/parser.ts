@@ -242,10 +242,12 @@ function calloutCards(
   const strip = (s: string) => s.replaceAll(settings.reverseEmoji, "").trim();
   const front = strip(c.title);
   const back = strip(c.body);
+  const forwardHash = cardHash(c.title + "\n" + c.body, "qa");
+  const reverseHash = cardHash(c.title + "\n" + c.body, "qa-rev");
 
   const cards: Omit<Card, "context">[] = [
     {
-      hash: cardHash(c.title + "\n" + c.body, "qa"),
+      hash: forwardHash,
       notePath,
       deck: decks[0],
       decks,
@@ -253,12 +255,13 @@ function calloutCards(
       front,
       back,
       reverse,
+      reverseOf: reverse ? reverseHash : undefined,
       sourceBlock: c.raw,
     },
   ];
   if (reverse) {
     cards.push({
-      hash: cardHash(c.title + "\n" + c.body, "qa-rev"),
+      hash: reverseHash,
       notePath,
       deck: decks[0],
       decks,
@@ -266,6 +269,7 @@ function calloutCards(
       front: back,
       back: front,
       reverse: true,
+      reverseOf: forwardHash,
       sourceBlock: c.raw,
     });
   }

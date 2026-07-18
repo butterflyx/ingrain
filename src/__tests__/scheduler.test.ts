@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { initialState, schedule, isDue } from "../scheduler";
+import { initialState, schedule, isDue, coordinateSiblingDue } from "../scheduler";
 
 const now = new Date("2026-07-13T00:00:00Z");
 
@@ -43,5 +43,35 @@ describe("scheduler (SM-2)", () => {
     s = schedule(s, 2, now);
     expect(s.reviewLog).toHaveLength(2);
     expect(s.reviewLog[1].rating).toBe(2);
+  });
+});
+
+describe("coordinateSiblingDue", () => {
+  it("sets the sibling's due to the just-reviewed card's new due", () => {
+    const sibling = initialState("sib", "n.md", now);
+    const updated = schedule(initialState("main", "n.md", now), 3, now);
+    const result = coordinateSiblingDue(sibling, updated);
+    expect(result.due).toBe(updated.due);
+  });
+
+  it("leaves the sibling's own scheduling history untouched", () => {
+    let sibling = initialState("sib", "n.md", now);
+    sibling = schedule(sibling, 4, now); // sibling has its own independent history
+    const updated = schedule(initialState("main", "n.md", now), 1, now);
+    const result = coordinateSiblingDue(sibling, updated);
+    expect(result.ease).toBe(sibling.ease);
+    expect(result.reps).toBe(sibling.reps);
+    expect(result.lapses).toBe(sibling.lapses);
+    expect(result.reviewLog).toEqual(sibling.reviewLog);
+  });
+
+  it("does not mutate either input", () => {
+    const sibling = initialState("sib", "n.md", now);
+    const updated = schedule(initialState("main", "n.md", now), 3, now);
+    const siblingBefore = JSON.stringify(sibling);
+    const updatedBefore = JSON.stringify(updated);
+    coordinateSiblingDue(sibling, updated);
+    expect(JSON.stringify(sibling)).toBe(siblingBefore);
+    expect(JSON.stringify(updated)).toBe(updatedBefore);
   });
 });

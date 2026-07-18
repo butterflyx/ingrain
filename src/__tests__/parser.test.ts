@@ -111,6 +111,25 @@ describe("parseNote — callouts", () => {
     expect(cards[1].back).toBe("Term");
   });
 
+  it("a reverse pair's two cards point at each other via reverseOf", () => {
+    const md = `#flashcards\n\n> [!card] Term 🔁\n> Definition`;
+    const cards = parseNote(md, "n.md", S);
+    expect(cards[0].reverseOf).toBe(cards[1].hash);
+    expect(cards[1].reverseOf).toBe(cards[0].hash);
+  });
+
+  it("a non-reversible callout has reverseOf undefined", () => {
+    const md = `#flashcards/net\n\n> [!card] What is OSI layer 3?\n> Network — routing`;
+    const cards = parseNote(md, "n.md", S);
+    expect(cards[0].reverseOf).toBeUndefined();
+  });
+
+  it("cloze cards have reverseOf undefined", () => {
+    const md = `#flashcards\n\n> [!card] OSI 1\n> The ==physical== layer moves ==bits==`;
+    const cards = parseNote(md, "n.md", S);
+    expect(cards.every((c) => c.reverseOf === undefined)).toBe(true);
+  });
+
   it("treats a callout body with clozes as cloze cards, not Q&A", () => {
     const md = `#flashcards\n\n> [!card] OSI 1\n> The ==physical== layer moves ==bits==`;
     const cards = parseNote(md, "n.md", S);
