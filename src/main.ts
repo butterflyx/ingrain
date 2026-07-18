@@ -58,6 +58,24 @@ export default class FlowcardsPlugin extends Plugin {
    *  so the review Modal can render front/back for due hashes, since
    *  CardState alone has no renderable content. */
   cardCache: Record<string, Card> = {};
+  /** Currently-open DecksView instances. Pushed a refresh directly from
+   *  every state-changing operation below, since not all of them route
+   *  through a workspace leaf-focus change that DecksView could otherwise
+   *  react to on its own -- e.g. resetAllProgress() is triggered from the
+   *  settings tab, which isn't a workspace leaf at all. */
+  private decksViews = new Set<DecksView>();
+
+  registerDecksView(view: DecksView): void {
+    this.decksViews.add(view);
+  }
+
+  unregisterDecksView(view: DecksView): void {
+    this.decksViews.delete(view);
+  }
+
+  private notifyDecksChanged(): void {
+    for (const view of this.decksViews) view.render();
+  }
 
   async onload() {
     await this.loadPersisted();
@@ -145,6 +163,7 @@ export default class FlowcardsPlugin extends Plugin {
     for (const c of cards) this.cardCache[c.hash] = c;
     for (const h of result.orphaned) delete this.cardCache[h];
     await this.save();
+    this.notifyDecksChanged();
   }
 
   private async rebuildIndex() {
@@ -164,6 +183,7 @@ export default class FlowcardsPlugin extends Plugin {
     this.states = swept.states;
     for (const h of swept.purged) delete this.cardCache[h];
     await this.save();
+    this.notifyDecksChanged();
   }
 
   startReview(deckPath?: string, onClose?: () => void) {
@@ -201,6 +221,7 @@ export default class FlowcardsPlugin extends Plugin {
     if (sibling) next = { ...next, [reverseOf!]: coordinateSiblingDue(sibling, state) };
     this.states = next;
     await this.save();
+    this.notifyDecksChanged();
   }
 
   private async loadPersisted() {
@@ -397,15 +418,22 @@ class DecksView extends ItemView {
     // A tab that was already open doesn't otherwise learn that
     // plugin.states/cardCache changed in the background (e.g. a note was
     // edited while this tab wasn't focused) -- refresh whenever it becomes
-    // the active leaf again.
+    // the active leaf again. This alone doesn't cover every case (e.g. the
+    // settings tab isn't a workspace leaf at all), so the plugin also pushes
+    // a refresh directly -- see registerDecksView()/notifyDecksChanged().
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", (leaf) => {
         if (leaf === this.leaf) this.render();
       }),
     );
+    this.plugin.registerDecksView(this);
   }
 
-  private render = () => {
+  async onClose() {
+    this.plugin.unregisterDecksView(this);
+  }
+
+  render = () => {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.createEl("h2", { text: "Decks" });
