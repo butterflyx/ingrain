@@ -92,26 +92,19 @@ ship before the ones they'd otherwise block.
   (pure session state machine) + `ReviewModal` in `main.ts` (DOM glue).
 - **M4 (not started): cloze/review correctness follow-ups.** Triaged from
   the idea backlog, in `(P:N)` order.
-  1. **(P:1) Hide seq footnote markers from the card view — needs a design
-     call before implementing.** Dev-vault repro (`Biologie.md`): a
-     same-seq cloze sentence placed OUTSIDE a callout renders `[^1]` as
-     visible, dangling markup in the card ("...Wasserstoff[^1]-Atomen...")
-     because `allowSeq=false` there deliberately leaves it unconsumed (the
-     footnote-safety fix from M2 step 3). Two possible resolutions, pick
-     one with the user first: (a) working as designed — the real fix is
-     moving seq-clozes inside a `[!card]` callout, where they already
-     group and render cleanly; or (b) strip `[^N]`-shaped suffixes from
-     rendered front/back even outside callouts (cosmetic only, still no
-     cross-cloze grouping there), which risks reopening the exact
-     footnote-collision problem M2 step 3 was built to avoid — would need
-     a safer heuristic (e.g. only strip it if no `[^N]:` footnote
-     definition exists anywhere in the note) rather than a blanket strip.
-     `parser.ts` `extractClozes`/`clozeCards`.
-  2. **(P:1) Reliable cloze tables** — clozes inside Markdown tables should
+  1. **(P:1) Reliable cloze tables** — clozes inside Markdown tables should
      render correctly instead of risking broken table syntax. Unblocked
      now that M2 shipped cloze grouping. Scope the first pass to tables
      inside callouts only (`parser.ts` `clozeCards()`/`renderCloze()`);
      loose tables outside callouts can follow later.
+  2. **(P:1) Multiple deck tags on one note — clarify and lock in the
+     behavior.** Currently undocumented: `extractDeck()` returns
+     `[...tags][0]`, the first tag found in `Set` insertion order
+     (frontmatter list scanned before inline tags, source order within
+     each) — deterministic today but easy to be surprised by, and nobody
+     has written a test pinning it down. Add a `parser.test.ts` case for a
+     note with 2+ matching tags, and document the rule in `CLAUDE.md`/
+     README. Prerequisite for item 5 below.
   3. **(P:2) Settings change triggers a reindex** — right now
      `saveSettings()` only persists; the user must manually run "Rebuild
      index" for e.g. a changed `calloutType` or `deckTagRoot` to take
@@ -123,6 +116,16 @@ ship before the ones they'd otherwise block.
      Needs a way to push the sibling's `due` out when its pair is reviewed
      (`scheduler.ts` and/or `reconcile.ts`, plus a way to link reverse
      pairs — they aren't linked today beyond sharing a `sourceBlock`).
+  5. **(P:2) Per-callout deck-tag override.** A callout's own body can
+     carry an inline `#flashcards/...` tag that overrides the note-level
+     deck just for cards produced from that callout. Explicitly
+     callout-only — does NOT apply to the "greedy" loose clozes outside
+     callouts, mirroring the M2 seq-grouping precedent (no well-defined
+     scope to attach an override to out there). Touches `calloutCards()`
+     (detect + prefer a tag found in `c.body`, reusing `findDeckTags()`-
+     style logic) instead of always taking the `deck` passed in from
+     `parseNote()`. Depends on item 2's resolution rule for the case where
+     the callout itself has multiple inline tags.
 - **M5 (not started, was M4): sidebar navigation & deck-scoped review.**
   1. Ribbon icon that opens "Review due cards" directly — trivial, zero new
      logic, ships first (`main.ts` `addRibbonIcon`).
@@ -156,4 +159,4 @@ milestone bullet (what changes, which files), and remove it from this list.
 Don't triage on your own initiative — wait to be asked, since priority
 here is the user's call, not yours.
 
-- (none right now — everything triaged into M4/M7 above)
+- (none right now — everything triaged into M4/M7 above) 
