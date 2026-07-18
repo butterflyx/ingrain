@@ -24,8 +24,12 @@ function dueState(hash: string) {
   return initialState(hash, "n.md", now); // due immediately
 }
 
+function notDueState(hash: string) {
+  return { ...initialState(hash, "n.md", now), due: new Date("2099-01-01").toISOString() };
+}
+
 describe("buildDeckTree", () => {
-  it("returns an empty array when nothing is due", () => {
+  it("returns an empty array when there are no cards at all", () => {
     expect(buildDeckTree({}, {}, now)).toEqual([]);
   });
 
@@ -34,13 +38,14 @@ describe("buildDeckTree", () => {
     const cardsByHash = { a: card("a", ["flashcards/spanish/verbs"]) };
     const tree = buildDeckTree(states, cardsByHash, now);
     expect(tree).toHaveLength(1);
-    expect(tree[0]).toMatchObject({ path: "flashcards", name: "flashcards", dueCount: 1 });
+    expect(tree[0]).toMatchObject({ path: "flashcards", name: "flashcards", dueCount: 1, totalCount: 1 });
     expect(tree[0].children).toHaveLength(1);
-    expect(tree[0].children[0]).toMatchObject({ path: "flashcards/spanish", dueCount: 1 });
+    expect(tree[0].children[0]).toMatchObject({ path: "flashcards/spanish", dueCount: 1, totalCount: 1 });
     expect(tree[0].children[0].children[0]).toMatchObject({
       path: "flashcards/spanish/verbs",
       name: "verbs",
       dueCount: 1,
+      totalCount: 1,
     });
   });
 
@@ -59,9 +64,10 @@ describe("buildDeckTree", () => {
     const tree = buildDeckTree(states, cardsByHash, now);
     expect(tree).toHaveLength(1);
     expect(tree[0].dueCount).toBe(1); // NOT 2 -- same card, deduped
+    expect(tree[0].totalCount).toBe(1); // same dedup applies to totalCount
     const [nodeA, nodeB] = tree[0].children;
-    expect(nodeA).toMatchObject({ path: "flashcards/a", dueCount: 1 });
-    expect(nodeB).toMatchObject({ path: "flashcards/b", dueCount: 1 });
+    expect(nodeA).toMatchObject({ path: "flashcards/a", dueCount: 1, totalCount: 1 });
+    expect(nodeB).toMatchObject({ path: "flashcards/b", dueCount: 1, totalCount: 1 });
   });
 
   it("children are sorted alphabetically", () => {
@@ -74,11 +80,22 @@ describe("buildDeckTree", () => {
     expect(tree[0].children.map((n) => n.name)).toEqual(["apple", "zebra"]);
   });
 
-  it("ignores states that aren't due yet", () => {
-    const notDue = { ...dueState("a"), due: new Date("2099-01-01").toISOString() };
-    const states: StateMap = { a: notDue };
+  it("a deck with cards but none currently due still appears, with dueCount 0", () => {
+    const states: StateMap = { a: notDueState("a") };
     const cardsByHash = { a: card("a", ["flashcards/spanish"]) };
-    expect(buildDeckTree(states, cardsByHash, now)).toEqual([]);
+    const tree = buildDeckTree(states, cardsByHash, now);
+    expect(tree).toHaveLength(1);
+    expect(tree[0]).toMatchObject({ path: "flashcards", dueCount: 0, totalCount: 1 });
+  });
+
+  it("totalCount reflects all cards, dueCount only the due subset, within one deck", () => {
+    const states: StateMap = { a: dueState("a"), b: notDueState("b") };
+    const cardsByHash = {
+      a: card("a", ["flashcards/spanish"]),
+      b: card("b", ["flashcards/spanish"]),
+    };
+    const tree = buildDeckTree(states, cardsByHash, now);
+    expect(tree[0]).toMatchObject({ dueCount: 1, totalCount: 2 });
   });
 });
 
