@@ -117,7 +117,9 @@ single Q&A card — the title is ignored in that case:
 
 ## Reviewing
 
-Open the command palette and run **Review due cards**. For each card:
+Click the layers icon in the ribbon, or open the command palette and run
+**Review due cards**, to review everything that's due across your whole
+vault. For each card:
 
 - Reveal the answer with the button, `Space`, or `Enter`.
 - Rate it **Again / Hard / Good / Easy** with the buttons or keys `1`–`4`.
@@ -125,6 +127,13 @@ Open the command palette and run **Review due cards**. For each card:
 
 Scheduling follows SM-2 (the same algorithm Anki popularized): a card you
 rate "Again" comes back soon, "Easy" pushes it further out.
+
+### Reviewing a single deck
+
+Run **Browse decks to review** from the command palette to see every deck
+(and subdeck) with a due count, and start a review scoped to just one of
+them instead of everything. A card belonging to several deck tags shows
+up under each of them, but — like always — is only ever reviewed once.
 
 ## Settings
 
