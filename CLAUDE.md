@@ -81,6 +81,7 @@ implement in the pure module. Only wire it into `main.ts` once tests are green.
 | Settings-triggered reindex | done | `main.ts` `FlowcardsSettingTab.hide()` → `saveSettings()` → `rebuildIndex()` |
 | Reverse-card due-date coordination | done | `types.ts` `Card.reverseOf`, `scheduler.ts` `coordinateSiblingDue` |
 | Per-callout deck-tag override | done | `parser.ts` `calloutCards()` — local `findDeckTags()` on the callout's own text |
+| Sidebar ribbon icon + deck-scoped review | done | `main.ts` `addRibbonIcon`/`DeckPickerModal`, `decks.ts` `buildDeckTree`/`filterByDeck` |
 | Configurable cloze pattern (custom regex) | open | `types.ts` `ClozeConfig` — highlight/bold toggle only, no pattern UI |
 | Bases note-aggregate export | open | not started |
 
@@ -97,22 +98,22 @@ ship before the ones they'd otherwise block.
 - **M3 (done):** the review Modal (mobile + desktop) — `src/review.ts`
   (pure session state machine) + `ReviewModal` in `main.ts` (DOM glue).
 - **M4 (done): cloze/review correctness follow-ups.** Reliable cloze
-  tables (turned out to already work, tests added as regression
-  coverage), multi-deck tags (`Card.decks`, a card belongs to every
-  matching tag, reviewed once, first tag used for display), settings
+  tables (string-splicing was already safe; a real bug was found later —
+  bold/highlighted table header rows were misread as clozes, fixed via
+  `tableHeaderRanges()`), multi-deck tags (`Card.decks`, a card belongs to
+  every matching tag, reviewed once, first tag used for display), settings
   changes reindex automatically on settings-tab close (not per keystroke
   — see `FlowcardsSettingTab.hide()`), reverse-card due-date coordination
   (`Card.reverseOf` + `coordinateSiblingDue()`), per-callout deck-tag
   override. See Implementation status above.
-- **M5 (not started, was M4): sidebar navigation & deck-scoped review.**
-  1. Ribbon icon that opens "Review due cards" directly — trivial, zero new
-     logic, ships first (`main.ts` `addRibbonIcon`).
-  2. An overview view/modal listing decks with due counts, so the user can
-     review one subdeck at a time instead of always reviewing everything —
-     needs `dueCards()`/`startReview()` to accept an optional deck-path
-     filter, plus a small pure helper to build a deck tree + counts from
-     the store.
-- **M6 (not started, was M5):** configurable cloze pattern UI (custom
+- **M5 (done): sidebar navigation & deck-scoped review.** Ribbon icon
+  (`addRibbonIcon`) opens "Review due cards" directly; "Browse decks to
+  review" command opens `DeckPickerModal`, showing a deck tree with due
+  counts (`decks.ts` `buildDeckTree`, dedupes multi-deck cards per node)
+  and an "All decks" shortcut. `startReview()` takes an optional
+  `deckPath`, filtered via `decks.ts` `filterByDeck()`. See Implementation
+  status above.
+- **M6 (not started):** configurable cloze pattern UI (custom
   regex beyond the highlight/bold toggle), optional Bases note-aggregate
   export.
 - **M7 (not started): polish & convenience.** All `(P:3)` from the idea
