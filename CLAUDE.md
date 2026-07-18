@@ -68,11 +68,13 @@ implement in the pure module. Only wire it into `main.ts` once tests are green.
 | Parser: callouts + inline clozes | done | `parser.ts` |
 | Note-tag gating | done | `parser.ts` `hasDeckTag` |
 | Cloze scope setting (whole note / callout-only) | done | `types.ts` `ClozeConfig.scope` |
+| Configurable callout type | done | `types.ts` `FlowcardsSettings.calloutType`, `parser.ts` `findCallouts` |
 | SM-2 scheduler | done | `scheduler.ts` |
 | Reconcile (hash identity, rename/orphan handling) | done | `reconcile.ts` |
 | Review session state machine + Modal | done | `review.ts` + `main.ts` `ReviewModal` |
-| Settings persistence | open | `main.ts` `loadPersisted()`/`save()` only round-trips `states`, not `settings` — settings-tab edits are lost on reload |
-| Cloze seq-grouping (classic clozes, Generalized Overlapping) | open | `parser.ts` `clozeCards()` — sibling model only, marked TODO |
+| Settings persistence | done | `main.ts` `PersistedData.settings`, `saveSettings()` |
+| Cloze seq-grouping (classic clozes, Generalized Overlapping) | done | `parser.ts` `groupClozes`/`extractClozes` — callout-only, `[^seq]` stays inert outside callouts to protect real footnotes |
+| Card context (nearest heading, filename fallback) | done | `parser.ts` `findHeadings`/`nearestHeading`, `types.ts` `Card.context` |
 | Configurable cloze pattern (custom regex) | open | `types.ts` `ClozeConfig` — highlight/bold toggle only, no pattern UI |
 | Bases note-aggregate export | open | not started |
 
@@ -83,27 +85,9 @@ part of the codebase they touch and ordered so smaller/independent pieces
 ship before the ones they'd otherwise block.
 
 - **M1 (done):** parser subset + hash + SM-2 + reconcile, all tested.
-- **M2 (in progress):** note-tag gating done, cloze-scope setting done.
-  Still open, in priority order:
-  1. **Configurable callout type** — a new setting for the callout type
-     that counts as a card (default `card`). `findCallouts()` currently
-     matches any `[!type]`, so a `[!warning]`/`[!note]`/etc. callout in a
-     tagged note becomes a Q&A card today; this scopes recognition down to
-     the configured type only, mirroring the note-tag gate one level
-     deeper (tag gates the *note*, this gates the *callout*).
-  2. **Persist settings** — `main.ts` `loadPersisted()`/`save()` only
-     round-trips `states`, not `settings`; settings-tab edits are lost on
-     reload. (Also where the new callout-type setting above needs to land
-     once this ships.)
-  3. **Cloze seq-grouping** — classic clozes sharing a `[^seq]` number
-     should collapse onto one card with Generalized-Overlapping-style
-     hiding, instead of today's independent sibling cards (`parser.ts`
-     `clozeCards()`, marked TODO).
-  4. **Card context** — attach the nearest heading above a card's source
-     block (fallback: the note's filename) so the review UI shows *where*
-     a card comes from, not just its deck. Touches `types.ts` (new `Card`
-     field), `parser.ts` (track the current heading while walking the note
-     body), `main.ts` `ReviewModal` (render it).
+- **M2 (done):** note-tag gating, cloze-scope setting, configurable callout
+  type, settings persistence, callout-only cloze seq-grouping, card
+  context (nearest heading). See Implementation status above.
 - **M3 (done):** the review Modal (mobile + desktop) — `src/review.ts`
   (pure session state machine) + `ReviewModal` in `main.ts` (DOM glue).
 - **M4 (not started): sidebar navigation & deck-scoped review.**
@@ -131,4 +115,9 @@ milestone bullet (what changes, which files), and remove it from this list.
 Don't triage on your own initiative — wait to be asked, since priority
 here is the user's call, not yours.
 
-- (none right now)
+- eigenes default icon für Karten callouts im css (P:3) 
+- Markdown-Tabellen mit Clozes müssen zuverlässig funktionieren. Zuvor muss die Gruppierung von Clozes funktionieren. Ein zulässiger Zwischenschritt wäre, dass das zunächst nur für Tabellen innerhalb von cards funktioniert. (P:1)
+- Übersetzung der Settings usw in andere Sprachen, iB Deutsch (P:3)
+- Settings-Änderung löst Re-Index aus. Das würden die meisten User erwarten (P:2)
+- Bei Reverse Karten: wenn eine Seite abgefragt wurde, die andere auf einen späteren Zeitpunkt verschieben, also nicht mehr aktuell offen. (P:2)
+- einen Befehl der einen card callout-skeleton an der aktuellen Cursor Position einfügt. Analog einer Vorlage für das templater plugin. Damit man schneller Karten anlegen kann (P:3)
