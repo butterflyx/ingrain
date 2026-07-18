@@ -207,12 +207,17 @@ export function parseNote(md: string, notePath: string, settings: FlowcardsSetti
 
   // Clozes outside callouts: split remaining text into blank-line blocks,
   // skip anything that was inside a callout, keep blocks that contain clozes.
-  const calloutRaw = new Set(callouts.map((c) => c.raw));
-  const blocks = body.split(/\n\s*\n/);
-  for (const block of blocks) {
-    if ([...calloutRaw].some((raw) => raw.includes(block.trim()) && block.trim())) continue;
-    if (/^>\s*\[!/.test(block.trim())) continue;
-    cards.push(...clozeCards(block.trim(), deck, notePath, settings));
+  // Gated by settings.cloze.scope — "callout-only" skips this entirely,
+  // leaving clozes inside callouts (handled above via calloutCards) as the
+  // only way to create cloze cards.
+  if (settings.cloze.scope !== "callout-only") {
+    const calloutRaw = new Set(callouts.map((c) => c.raw));
+    const blocks = body.split(/\n\s*\n/);
+    for (const block of blocks) {
+      if ([...calloutRaw].some((raw) => raw.includes(block.trim()) && block.trim())) continue;
+      if (/^>\s*\[!/.test(block.trim())) continue;
+      cards.push(...clozeCards(block.trim(), deck, notePath, settings));
+    }
   }
 
   return cards;

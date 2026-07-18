@@ -13,6 +13,7 @@ import {
 import {
   Card,
   CardState,
+  ClozeScope,
   DEFAULT_SETTINGS,
   FlowcardsSettings,
   PersistedData,
@@ -325,5 +326,22 @@ class FlowcardsSettingTab extends PluginSettingTab {
         this.plugin.settings.cloze.bold = v;
       }),
     );
+
+    new Setting(containerEl)
+      .setName("Cloze scope")
+      .setDesc(
+        "Where cloze markers count as cards. Callouts are always card " +
+          "candidates either way — this only controls loose clozes in the " +
+          "rest of the note.",
+      )
+      .addDropdown((d) =>
+        d
+          .addOption("anywhere", "Whole note")
+          .addOption("callout-only", "Inside callouts only")
+          .setValue(this.plugin.settings.cloze.scope)
+          .onChange((v) => {
+            this.plugin.settings.cloze.scope = v as ClozeScope;
+          }),
+      );
   }
 }

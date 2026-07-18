@@ -64,10 +64,16 @@ export interface PersistedData {
   states: StateMap;
 }
 
+/** Where cloze markers are recognized: everywhere in the note body, or only
+ *  inside callouts (an explicit "this is a card" container). Does not affect
+ *  callouts themselves — those are always card candidates regardless. */
+export type ClozeScope = "anywhere" | "callout-only";
+
 /** User-configurable cloze syntax. Highlight and bold are both toggleable. */
 export interface ClozeConfig {
   highlight: boolean; // ==answer==
   bold: boolean; // **answer**
+  scope: ClozeScope;
 }
 
 export interface FlowcardsSettings {
@@ -79,5 +85,5 @@ export interface FlowcardsSettings {
 export const DEFAULT_SETTINGS: FlowcardsSettings = {
   deckTagRoot: "flashcards",
   reverseEmoji: "🔁",
-  cloze: { highlight: true, bold: true },
+  cloze: { highlight: true, bold: true, scope: "anywhere" },
 };

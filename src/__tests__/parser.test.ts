@@ -77,6 +77,35 @@ describe("parseNote — callouts", () => {
   });
 });
 
+describe("cloze scope setting", () => {
+  const CALLOUT_ONLY = { ...S, cloze: { ...S.cloze, scope: "callout-only" as const } };
+
+  it("callout-only scope ignores clozes outside callouts", () => {
+    const md = `#flashcards\n\nThe ==physical== layer moves ==bits==.`;
+    expect(parseNote(md, "n.md", CALLOUT_ONLY)).toEqual([]);
+  });
+
+  it("callout-only scope still recognizes clozes inside a callout", () => {
+    const md = `#flashcards\n\n> [!card] OSI 1\n> The ==physical== layer moves ==bits==`;
+    const cards = parseNote(md, "n.md", CALLOUT_ONLY);
+    expect(cards).toHaveLength(2);
+    expect(cards.every((c) => c.kind === "cloze")).toBe(true);
+  });
+
+  it("callout-only scope leaves plain (non-cloze) callouts and unrelated prose untouched", () => {
+    const md = `#flashcards\n\n> [!card] Term\n> Definition\n\nJust prose with **no** flashcard meaning here... wait, **no** is bold.`;
+    // "no" is technically a bold cloze match, but callout-only scope must ignore it.
+    const cards = parseNote(md, "n.md", CALLOUT_ONLY);
+    expect(cards).toHaveLength(1);
+    expect(cards[0].kind).toBe("callout-qa");
+  });
+
+  it("the default scope (anywhere) is unaffected — outside-callout clozes still work", () => {
+    const md = `#flashcards\n\nThe ==physical== layer moves ==bits==.`;
+    expect(parseNote(md, "n.md", S)).toHaveLength(2);
+  });
+});
+
 describe("parseNote — inline clozes", () => {
   it("produces one sibling card per cloze, back reveals all", () => {
     const md = `#flashcards\n\nThe ==physical== layer moves ==bits==.`;
