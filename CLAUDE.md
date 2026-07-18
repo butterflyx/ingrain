@@ -75,6 +75,11 @@ implement in the pure module. Only wire it into `main.ts` once tests are green.
 | Settings persistence | done | `main.ts` `PersistedData.settings`, `saveSettings()` |
 | Cloze seq-grouping (classic clozes, Generalized Overlapping) | done | `parser.ts` `groupClozes`/`extractClozes` — callout-only, `[^seq]` stays inert outside callouts to protect real footnotes |
 | Card context (nearest heading, filename fallback) | done | `parser.ts` `findHeadings`/`nearestHeading`, `types.ts` `Card.context` |
+| Cloze tables (inside callouts) | done | `parser.ts` — already worked via string-splicing, pinned down with tests, no fix needed |
+| Multi-deck tags (`Card.decks`) | done | `types.ts` `Card.decks`, `parser.ts` `extractDecks` |
+| Settings-triggered reindex | done | `main.ts` `FlowcardsSettingTab.hide()` → `saveSettings()` → `rebuildIndex()` |
+| Reverse-card due-date coordination | done | `types.ts` `Card.reverseOf`, `scheduler.ts` `coordinateSiblingDue` |
+| Per-callout deck-tag override | done | `parser.ts` `calloutCards()` — local `findDeckTags()` on the callout's own text |
 | Configurable cloze pattern (custom regex) | open | `types.ts` `ClozeConfig` — highlight/bold toggle only, no pattern UI |
 | Bases note-aggregate export | open | not started |
 
@@ -90,42 +95,14 @@ ship before the ones they'd otherwise block.
   context (nearest heading). See Implementation status above.
 - **M3 (done):** the review Modal (mobile + desktop) — `src/review.ts`
   (pure session state machine) + `ReviewModal` in `main.ts` (DOM glue).
-- **M4 (not started): cloze/review correctness follow-ups.** Triaged from
-  the idea backlog, in `(P:N)` order.
-  1. **(P:1) Reliable cloze tables** — clozes inside Markdown tables should
-     render correctly instead of risking broken table syntax. Unblocked
-     now that M2 shipped cloze grouping. Scope the first pass to tables
-     inside callouts only (`parser.ts` `clozeCards()`/`renderCloze()`);
-     loose tables outside callouts can follow later.
-  2. **(P:1) Multiple deck tags on one note — clarify and lock in the
-     behavior.** Currently undocumented: `extractDeck()` returns
-     `[...tags][0]`, the first tag found in `Set` insertion order
-     (frontmatter list scanned before inline tags, source order within
-     each) — deterministic today but easy to be surprised by, and nobody
-     has written a test pinning it down. Add a `parser.test.ts` case for a
-     note with 2+ matching tags, and document the rule in `CLAUDE.md`/
-     README. Prerequisite for item 5 below.
-  3. **(P:2) Settings change triggers a reindex** — right now
-     `saveSettings()` only persists; the user must manually run "Rebuild
-     index" for e.g. a changed `calloutType` or `deckTagRoot` to take
-     effect. Most users would expect this automatically (`main.ts`
-     `saveSettings()` → call `rebuildIndex()`).
-  4. **(P:2) Reverse-card due-date coordination** — reviewing one side of a
-     reverse pair currently leaves the other side's `CardState` untouched,
-     so it can still show up as due in the same/next session right after.
-     Needs a way to push the sibling's `due` out when its pair is reviewed
-     (`scheduler.ts` and/or `reconcile.ts`, plus a way to link reverse
-     pairs — they aren't linked today beyond sharing a `sourceBlock`).
-  5. **(P:2) Per-callout deck-tag override.** A callout's own body can
-     carry an inline `#flashcards/...` tag that overrides the note-level
-     deck just for cards produced from that callout. Explicitly
-     callout-only — does NOT apply to the "greedy" loose clozes outside
-     callouts, mirroring the M2 seq-grouping precedent (no well-defined
-     scope to attach an override to out there). Touches `calloutCards()`
-     (detect + prefer a tag found in `c.body`, reusing `findDeckTags()`-
-     style logic) instead of always taking the `deck` passed in from
-     `parseNote()`. Depends on item 2's resolution rule for the case where
-     the callout itself has multiple inline tags.
+- **M4 (done): cloze/review correctness follow-ups.** Reliable cloze
+  tables (turned out to already work, tests added as regression
+  coverage), multi-deck tags (`Card.decks`, a card belongs to every
+  matching tag, reviewed once, first tag used for display), settings
+  changes reindex automatically on settings-tab close (not per keystroke
+  — see `FlowcardsSettingTab.hide()`), reverse-card due-date coordination
+  (`Card.reverseOf` + `coordinateSiblingDue()`), per-callout deck-tag
+  override. See Implementation status above.
 - **M5 (not started, was M4): sidebar navigation & deck-scoped review.**
   1. Ribbon icon that opens "Review due cards" directly — trivial, zero new
      logic, ships first (`main.ts` `addRibbonIcon`).
@@ -159,4 +136,4 @@ milestone bullet (what changes, which files), and remove it from this list.
 Don't triage on your own initiative — wait to be asked, since priority
 here is the user's call, not yours.
 
-- (none right now — everything triaged into M4/M7 above) 
+- Bilder cloze mittels Canvas in Obsidian umsetzen. Boardmittel wo immer möglich. (P:2)
