@@ -2,6 +2,7 @@ import {
   App,
   ButtonComponent,
   Component,
+  Editor,
   ItemView,
   MarkdownRenderer,
   Modal,
@@ -126,6 +127,18 @@ export default class FlowcardsPlugin extends Plugin {
       id: "browse-decks",
       name: "Open deck overview",
       callback: () => void this.activateDecksView(),
+    });
+
+    this.addCommand({
+      id: "insert-card-skeleton",
+      name: "Insert card skeleton",
+      editorCallback: (editor: Editor) => {
+        const type = this.settings.calloutType || "card";
+        const prefix = `> [!${type}] `;
+        const cursor = editor.getCursor();
+        editor.replaceSelection(`${prefix}\n> \n`);
+        editor.setCursor({ line: cursor.line, ch: prefix.length });
+      },
     });
 
     this.addSettingTab(new FlowcardsSettingTab(this.app, this));
