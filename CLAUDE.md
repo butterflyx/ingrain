@@ -84,6 +84,7 @@ implement in the pure module. Only wire it into `main.ts` once tests are green.
 | Deck overview page + deck-scoped review | done | `main.ts` `DecksView`, `decks.ts` `buildDeckTree`/`filterByDeck`; linkable via `obsidian://flowcards-decks`; refreshes via `FlowcardsPlugin.notifyDecksChanged()` (pushed on every state change) + `active-leaf-change` + a manual refresh action |
 | New notes indexed on creation | done | `main.ts` `vault.on("create", ...)`, same path as `modify` |
 | Reset all learning progress | done | `main.ts` `FlowcardsPlugin.resetAllProgress()`, `ConfirmResetModal`, settings-tab "Danger zone" |
+| DecksView rating breakdown | done | `decks.ts` `DeckNode.dueByRating`/`classify()`, `main.ts` `DecksView.renderBreakdown()` — colored Again/Hard/Good/Easy/New badges + total, replaces the old due/total label |
 | Configurable cloze pattern (custom regex) | dropped | user doesn't need this — highlight/bold toggle stays the permanent design |
 | Bases note-aggregate export | dropped | user doesn't need this — store-only stays the permanent design |
 
@@ -102,17 +103,9 @@ ordering/grouping history plus what's still open.
   multi-deck tags, settings-triggered reindex, reverse-card due-date
   coordination, per-callout deck-tag override.
 - **M5 (done):** deck overview page (`DecksView`) & deck-scoped review.
-- **M6 (not started): DecksView rating breakdown (P:2).** "In DecksView
-  nicht nur die Anzahl der fälligen Karten, sondern auch eine farbliche
-  Statistik nach again/hard/good/easy — wie viele offene Karten sind
-  leicht, wie viele schwer, usw." Needs a design decision before
-  implementing: what defines a card's "difficulty tier" for this display
-  — `CardState.ease` (continuous, needs bucket thresholds) or the most
-  recent `reviewLog` entry's rating (discrete, but undefined for a
-  never-reviewed card)? Touches `decks.ts` `DeckNode` (a per-tier
-  breakdown alongside `dueCount`/`totalCount`) and `main.ts` `DecksView`
-  (color-coded rendering) — ask the user for the exact bucket definition
-  first.
+- **M6 (done):** DecksView rating breakdown — due cards per deck shown as
+  colored Again/Hard/Good/Easy/New badges (last `reviewLog` rating, or
+  New if never reviewed) instead of a plain due/total label.
 - **M7 (not started): time-based review reminder (P:2).** "Eine
   Erinnerung Zeit-basiert und konfigurierbar, zb alle N Tage." Needs a
   design decision before implementing: a new `FlowcardsSettings` interval
