@@ -21,11 +21,15 @@ export interface Card {
   front: string;
   back: string;
   reverse: boolean;
-  /** For cloze cards: which cloze within the source block (0-based). */
+  /** For cloze cards: 0-based index of this card's cloze GROUP within the
+   *  source block (clozes sharing a seq collapse into one group/card). */
   clozeIndex?: number;
-  /** Optional hint shown on the front of a cloze card. */
+  /** Hint shown for a blanked cloze occurrence. For a grouped card this is
+   *  the first member's hint — each occurrence still renders its own hint
+   *  in `front`, this field is just a representative single value. */
   hint?: string;
-  /** Optional sequence number grouping clozes onto one card (classic clozes). */
+  /** Sequence number that grouped this card's clozes (classic clozes,
+   *  callout-only — see extractClozes()). Undefined for ungrouped cards. */
   seq?: string;
   /** Raw source block the card was derived from. Basis for hashing + locating. */
   sourceBlock: string;

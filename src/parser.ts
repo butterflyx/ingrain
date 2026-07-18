@@ -69,13 +69,32 @@ export function hasDeckTag(md: string, settings: FlowcardsSettings): boolean {
   return findDeckTags(md, settings).size > 0;
 }
 
-/** Find `==answer==` / `**answer**` clozes with optional ^[hint] and [^seq]. */
-export function extractClozes(text: string, settings: FlowcardsSettings): ClozeMatch[] {
+/**
+ * Find `==answer==` / `**answer**` clozes with an optional ^[hint].
+ *
+ * `[^seq]` (classic-cloze grouping) is only recognized when `allowSeq` is
+ * true — it is syntactically identical to an Obsidian footnote reference,
+ * so outside a callout body it is left completely alone (not matched, not
+ * consumed) to avoid mangling real footnotes or colliding with other
+ * plugins that process them. Callers control this per call site; see
+ * clozeCards().
+ */
+export function extractClozes(text: string, settings: FlowcardsSettings, allowSeq: boolean): ClozeMatch[] {
   const patterns: RegExp[] = [];
-  if (settings.cloze.highlight)
-    patterns.push(/==([^=]+?)==(?:\^\[([^\]]+)\])?(?:\[\^([^\]]+)\])?/g);
-  if (settings.cloze.bold)
-    patterns.push(/\*\*([^*]+?)\*\*(?:\^\[([^\]]+)\])?(?:\[\^([^\]]+)\])?/g);
+  if (settings.cloze.highlight) {
+    patterns.push(
+      allowSeq
+        ? /==([^=]+?)==(?:\^\[([^\]]+)\])?(?:\[\^([^\]]+)\])?/g
+        : /==([^=]+?)==(?:\^\[([^\]]+)\])?/g,
+    );
+  }
+  if (settings.cloze.bold) {
+    patterns.push(
+      allowSeq
+        ? /\*\*([^*]+?)\*\*(?:\^\[([^\]]+)\])?(?:\[\^([^\]]+)\])?/g
+        : /\*\*([^*]+?)\*\*(?:\^\[([^\]]+)\])?/g,
+    );
+  }
 
   const found: ClozeMatch[] = [];
   for (const re of patterns) {
@@ -92,13 +111,14 @@ export function extractClozes(text: string, settings: FlowcardsSettings): ClozeM
   return found.sort((a, b) => a.start - b.start);
 }
 
-/** Render a block with one target cloze blanked and the rest revealed. */
-function renderCloze(text: string, clozes: ClozeMatch[], target: number | null): string {
+/** Render a block with a set of target clozes blanked and the rest revealed.
+ *  `null` reveals everything (used for the back of the card). */
+function renderCloze(text: string, clozes: ClozeMatch[], targets: Set<number> | null): string {
   let out = "";
   let cursor = 0;
   clozes.forEach((c, i) => {
     out += text.slice(cursor, c.start);
-    if (target !== null && i === target) out += c.hint ? `[${c.hint}]` : "[...]";
+    if (targets !== null && targets.has(i)) out += c.hint ? `[${c.hint}]` : "[...]";
     else out += c.answer; // revealed, markers stripped
     cursor = c.end;
   });
@@ -106,23 +126,52 @@ function renderCloze(text: string, clozes: ClozeMatch[], target: number | null):
   return out.trim();
 }
 
-function clozeCards(block: string, deck: string, notePath: string, settings: FlowcardsSettings): Card[] {
-  const clozes = extractClozes(block, settings);
+/** Group cloze indices sharing the same `seq` into one card (classic-cloze,
+ *  Generalized-Overlapping-style hiding); clozes without a seq (or when seq
+ *  isn't allowed at all) each remain their own singleton group, in
+ *  first-occurrence order. This is why, for blocks with no seq usage, group
+ *  index always equals cloze index — identity/hashes stay stable. */
+function groupClozes(clozes: ClozeMatch[]): number[][] {
+  const groups: number[][] = [];
+  const bySeq = new Map<string, number>();
+  clozes.forEach((c, i) => {
+    if (c.seq !== undefined) {
+      const existing = bySeq.get(c.seq);
+      if (existing !== undefined) {
+        groups[existing].push(i);
+        return;
+      }
+      bySeq.set(c.seq, groups.length);
+    }
+    groups.push([i]);
+  });
+  return groups;
+}
+
+/** `allowSeq` gates classic-cloze grouping — true only for clozes inside a
+ *  callout body of the configured type (see calloutCards()); false for
+ *  loose clozes elsewhere in the note, where `[^seq]` must stay inert. */
+function clozeCards(
+  block: string,
+  deck: string,
+  notePath: string,
+  settings: FlowcardsSettings,
+  allowSeq: boolean,
+): Card[] {
+  const clozes = extractClozes(block, settings, allowSeq);
   if (!clozes.length) return [];
   const back = renderCloze(block, clozes, null);
-  // v1: sibling model — one card per cloze. TODO: group by `seq`, honour
-  // Generalized Overlapping actions to hide siblings instead of showing them.
-  return clozes.map((c, i) => ({
-    hash: cardHash(block, `cloze:${i}`),
+  return groupClozes(clozes).map((group, gi) => ({
+    hash: cardHash(block, `cloze:${gi}`),
     notePath,
     deck,
     kind: "cloze" as const,
-    front: renderCloze(block, clozes, i),
+    front: renderCloze(block, clozes, new Set(group)),
     back,
     reverse: false,
-    clozeIndex: i,
-    hint: c.hint,
-    seq: c.seq,
+    clozeIndex: gi,
+    hint: clozes[group[0]].hint,
+    seq: clozes[group[0]].seq,
     sourceBlock: block,
   }));
 }
@@ -165,8 +214,11 @@ export function findCallouts(body: string, settings: FlowcardsSettings): Callout
 }
 
 function calloutCards(c: Callout, deck: string, notePath: string, settings: FlowcardsSettings): Card[] {
-  // If the body carries clozes, it's a cloze card, not Q&A.
-  const inner = clozeCards(c.body, deck, notePath, settings);
+  // If the body carries clozes, it's a cloze card, not Q&A. Seq-grouping is
+  // allowed here: c is already a callout of the configured type (see
+  // findCallouts()), so this is exactly the "explicit card container" the
+  // seq feature is scoped to.
+  const inner = clozeCards(c.body, deck, notePath, settings, true);
   if (inner.length) return inner;
 
   const reverse = c.title.includes(settings.reverseEmoji) || c.body.includes(settings.reverseEmoji);
@@ -215,14 +267,16 @@ export function parseNote(md: string, notePath: string, settings: FlowcardsSetti
   // skip anything that was inside a callout, keep blocks that contain clozes.
   // Gated by settings.cloze.scope — "callout-only" skips this entirely,
   // leaving clozes inside callouts (handled above via calloutCards) as the
-  // only way to create cloze cards.
+  // only way to create cloze cards. Seq-grouping is NEVER allowed here
+  // (allowSeq: false) — [^seq] is footnote syntax outside a callout and
+  // must stay inert, see extractClozes().
   if (settings.cloze.scope !== "callout-only") {
     const calloutRaw = new Set(callouts.map((c) => c.raw));
     const blocks = body.split(/\n\s*\n/);
     for (const block of blocks) {
       if ([...calloutRaw].some((raw) => raw.includes(block.trim()) && block.trim())) continue;
       if (/^>\s*\[!/.test(block.trim())) continue;
-      cards.push(...clozeCards(block.trim(), deck, notePath, settings));
+      cards.push(...clozeCards(block.trim(), deck, notePath, settings, false));
     }
   }
 
