@@ -94,32 +94,6 @@ export default class SiftPlugin extends Plugin {
     this.locale = moment.locale();
     await this.loadPersisted();
 
-    // Keep path metadata fresh on rename. Non-load-bearing: identity is the
-    // content hash, so even a missed rename self-heals on the next parse.
-    this.registerEvent(
-      this.app.vault.on("rename", (file, oldPath) => {
-        if (file instanceof TFile) {
-          this.states = renameNotePath(this.states, oldPath, file.path);
-          void this.save();
-        }
-      }),
-    );
-
-    // Re-index a note whenever it changes.
-    this.registerEvent(
-      this.app.vault.on("modify", (file) => {
-        if (file instanceof TFile && file.extension === "md") void this.indexFile(file);
-      }),
-    );
-
-    // Index a brand-new note as soon as it's created, not just on edit --
-    // otherwise cards in it wouldn't show up until the next full rebuild.
-    this.registerEvent(
-      this.app.vault.on("create", (file) => {
-        if (file instanceof TFile && file.extension === "md") void this.indexFile(file);
-      }),
-    );
-
     this.addCommand({
       id: "review-due",
       name: t(this.locale, "cmdReviewDue"),
@@ -161,8 +135,41 @@ export default class SiftPlugin extends Plugin {
 
     this.addRibbonIcon("graduation-cap", t(this.locale, "ribbonOpenDecks"), () => void this.activateDecksView());
 
-    // Full sweep on load to purge states from deleted notes.
-    this.app.workspace.onLayoutReady(() => void this.rebuildIndex());
+    // Vault event listeners are registered here, not synchronously in
+    // onload(), because Obsidian fires `create` for every existing file
+    // during vault startup -- registering earlier would trigger a redundant
+    // indexFile() per file on top of the full rebuildIndex() sweep below.
+    this.app.workspace.onLayoutReady(() => {
+      // Keep path metadata fresh on rename. Non-load-bearing: identity is
+      // the content hash, so even a missed rename self-heals on the next
+      // parse.
+      this.registerEvent(
+        this.app.vault.on("rename", (file, oldPath) => {
+          if (file instanceof TFile) {
+            this.states = renameNotePath(this.states, oldPath, file.path);
+            void this.save();
+          }
+        }),
+      );
+
+      // Re-index a note whenever it changes.
+      this.registerEvent(
+        this.app.vault.on("modify", (file) => {
+          if (file instanceof TFile && file.extension === "md") void this.indexFile(file);
+        }),
+      );
+
+      // Index a brand-new note as soon as it's created, not just on edit --
+      // otherwise cards in it wouldn't show up until the next full rebuild.
+      this.registerEvent(
+        this.app.vault.on("create", (file) => {
+          if (file instanceof TFile && file.extension === "md") void this.indexFile(file);
+        }),
+      );
+
+      // Full sweep on load to purge states from deleted notes.
+      void this.rebuildIndex();
+    });
 
     // Check once on load -- catches an interval that elapsed while
     // Obsidian was closed, since the timer below only fires while it's
