@@ -1,14 +1,14 @@
-# Flowcards
+# Sift
 
-Reading-flow-first spaced repetition for [Obsidian](https://obsidian.md).
-Your notes stay readable — cards come from callouts and highlighted text you
-already write, not from dedicated flashcard blocks.
+Spaced repetition for [Obsidian](https://obsidian.md) that sifts flashcards
+out of the notes you already write — cards come from callouts and
+highlighted text, not from dedicated flashcard blocks.
 
 ## Why
 
 Most spaced-repetition plugins ask you to write in a special syntax, wrap
 everything in dedicated blocks, or clutter your notes with per-card
-frontmatter. Flowcards works with the way you already take notes:
+frontmatter. Sift works with the way you already take notes:
 
 - **No required syntax.** A callout is a card. A highlighted or bolded word
   is a cloze. Nothing else changes about how you write.
@@ -23,12 +23,12 @@ frontmatter. Flowcards works with the way you already take notes:
 
 ## Installing
 
-Flowcards isn't in the Community Plugins directory yet, so for now you build
+Sift isn't in the Community Plugins directory yet, so for now you build
 it from source:
 
 ```bash
 git clone <this-repo>
-cd flowcards
+cd sift
 npm install
 npm run build
 ```
@@ -36,16 +36,16 @@ npm run build
 Then copy (or symlink) the folder into your vault's plugins directory:
 
 ```bash
-ln -sfn "$(pwd)" "/path/to/YourVault/.obsidian/plugins/flowcards"
+ln -sfn "$(pwd)" "/path/to/YourVault/.obsidian/plugins/sift"
 ```
 
-Open Obsidian, go to **Settings → Community plugins**, and enable Flowcards.
+Open Obsidian, go to **Settings → Community plugins**, and enable Sift.
 
 ## Creating cards
 
 ### 1. Tag the note
 
-Flowcards only looks at notes carrying your configured deck tag — `#flashcards`
+Sift only looks at notes carrying your configured deck tag — `#flashcards`
 by default. Add it anywhere: inline in the text, or as a frontmatter tag.
 Notes without the tag are left alone entirely, even if they happen to contain
 a callout or a highlighted word.
@@ -83,7 +83,7 @@ Run **Insert card skeleton** from the command palette to drop a blank
 `> [!card] ` block at the cursor, using whatever callout type is
 currently configured.
 
-Flowcards ships a default look for `[!card]` callouts — a graduation-cap
+Sift ships a default look for `[!card]` callouts — a graduation-cap
 icon and a light background — so they stand out from your other callout
 types at a glance. This styling is tied to the default callout type name;
 if you change **Callout type** in settings to something else, the CSS no
@@ -145,7 +145,7 @@ cloze:
 ```
 
 (Outside a callout, `[^1]`-style references are left alone on purpose —
-that syntax is a real Obsidian footnote reference, and Flowcards won't
+that syntax is a real Obsidian footnote reference, and Sift won't
 touch it there.)
 
 ## Reviewing
@@ -183,12 +183,12 @@ to it from any other note (e.g. your daily note) with a plain Markdown
 link:
 
 ```markdown
-[Review decks](obsidian://flowcards-decks)
+[Review decks](obsidian://sift-decks)
 ```
 
 ## Keeping the index up to date
 
-Flowcards re-scans a note automatically when you create or edit it, and
+Sift re-scans a note automatically when you create or edit it, and
 re-scans the whole vault when a setting that affects parsing changes
 (deck tag, callout type, cloze options). If something ever looks out of
 sync anyway, run **Rebuild index (sweep orphans)** from the command
