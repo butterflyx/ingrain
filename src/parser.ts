@@ -1,4 +1,4 @@
-import { Card, FlowcardsSettings } from "./types";
+import { Card, SiftSettings } from "./types";
 import { cardHash } from "./hash";
 
 // PURE parser: string in, Card[] out. No "obsidian" import — fully vitest-able.
@@ -25,7 +25,7 @@ function splitFrontmatter(md: string): { body: string; fm: string } {
 /** Collect every tag under the configured root, from frontmatter `tags:` and
  *  inline `#tags` alike. Shared by extractDeck() and hasDeckTag() so the two
  *  never drift out of sync on what counts as "tagged". */
-function findDeckTags(md: string, settings: FlowcardsSettings): Set<string> {
+function findDeckTags(md: string, settings: SiftSettings): Set<string> {
   const root = settings.deckTagRoot;
   const tags = new Set<string>();
 
@@ -52,7 +52,7 @@ function findDeckTags(md: string, settings: FlowcardsSettings): Set<string> {
  * Looks in both frontmatter `tags:` and inline `#tags`. Subtag hierarchy
  * (tag/subtag) is preserved verbatim so the review layer can build the tree.
  */
-export function extractDeck(md: string, settings: FlowcardsSettings): string {
+export function extractDeck(md: string, settings: SiftSettings): string {
   return extractDecks(md, settings)[0];
 }
 
@@ -63,7 +63,7 @@ export function extractDeck(md: string, settings: FlowcardsSettings): string {
  * root-only entry when no tag matches. extractDeck() is always the first
  * element of this array.
  */
-export function extractDecks(md: string, settings: FlowcardsSettings): string[] {
+export function extractDecks(md: string, settings: SiftSettings): string[] {
   const tags = findDeckTags(md, settings);
   return tags.size ? [...tags] : [settings.deckTagRoot];
 }
@@ -72,11 +72,11 @@ export function extractDecks(md: string, settings: FlowcardsSettings): string[] 
  * True iff the note carries the configured deck-tag-root anywhere
  * (frontmatter tag list or inline #tag). Gates parseNote(): a note without
  * this tag produces zero cards, regardless of callouts/clozes present — this
- * is the actual opt-in that scopes Flowcards to notes the user marked for
+ * is the actual opt-in that scopes Sift to notes the user marked for
  * spaced repetition, rather than any note that happens to contain a
  * highlight or a callout.
  */
-export function hasDeckTag(md: string, settings: FlowcardsSettings): boolean {
+export function hasDeckTag(md: string, settings: SiftSettings): boolean {
   return findDeckTags(md, settings).size > 0;
 }
 
@@ -118,7 +118,7 @@ function tableHeaderRanges(text: string): [number, number][] {
  * table styling, not quiz content (dev-vault repro: a "**Layer**" header
  * cell was silently becoming its own cloze card).
  */
-export function extractClozes(text: string, settings: FlowcardsSettings, allowSeq: boolean): ClozeMatch[] {
+export function extractClozes(text: string, settings: SiftSettings, allowSeq: boolean): ClozeMatch[] {
   const patterns: RegExp[] = [];
   if (settings.cloze.highlight) {
     patterns.push(
@@ -196,7 +196,7 @@ function clozeCards(
   block: string,
   decks: string[],
   notePath: string,
-  settings: FlowcardsSettings,
+  settings: SiftSettings,
   allowSeq: boolean,
 ): Omit<Card, "context">[] {
   const clozes = extractClozes(block, settings, allowSeq);
@@ -227,7 +227,7 @@ interface Callout {
 /** Extract `> [!type] Title` + `> body` callout blocks whose type matches
  *  settings.calloutType (case-insensitive). Non-matching callout types
  *  (e.g. [!note], [!warning]) are fully skipped — they never become cards. */
-export function findCallouts(body: string, settings: FlowcardsSettings): Callout[] {
+export function findCallouts(body: string, settings: SiftSettings): Callout[] {
   const wantedType = settings.calloutType.toLowerCase();
   const lines = body.split("\n");
   const callouts: Callout[] = [];
@@ -259,7 +259,7 @@ function calloutCards(
   c: Callout,
   decks: string[],
   notePath: string,
-  settings: FlowcardsSettings,
+  settings: SiftSettings,
 ): Omit<Card, "context">[] {
   // A callout can carry its own deck tag(s), overriding the note-level
   // decks just for cards produced from it — same "first tag(s) win"
@@ -337,7 +337,7 @@ function nearestHeading(headings: Heading[], offset: number): string | null {
 }
 
 /** Top-level entry point. */
-export function parseNote(md: string, notePath: string, settings: FlowcardsSettings): Card[] {
+export function parseNote(md: string, notePath: string, settings: SiftSettings): Card[] {
   if (!hasDeckTag(md, settings)) return [];
   const decks = extractDecks(md, settings);
   const { body } = splitFrontmatter(md);

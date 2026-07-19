@@ -1,35 +1,35 @@
-.flowcards-context {
+.sift-context {
   font-size: 0.8em;
   color: var(--text-faint);
   margin-bottom: 0.5em;
 }
 
-.flowcards-front {
+.sift-front {
   font-size: 1.1em;
   margin-bottom: 1em;
 }
 
-.flowcards-back {
+.sift-back {
   margin: 1em 0;
   color: var(--text-muted);
 }
 
-.flowcards-ratings {
+.sift-ratings {
   display: flex;
   gap: 0.5em;
   margin-top: 1em;
 }
 
-.flowcards-ratings button {
+.sift-ratings button {
   flex: 1;
 }
 
-.flowcards-deck-tree {
+.sift-deck-tree {
   margin-top: 1em;
   max-width: 40em;
 }
 
-.flowcards-deck-row {
+.sift-deck-row {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -37,45 +37,45 @@
   margin-top: 0.25em;
 }
 
-.flowcards-rating-badge {
+.sift-rating-badge {
   padding: 0.05em 0.5em;
   border-radius: 0.75em;
   font-size: 0.8em;
   color: var(--text-on-accent);
 }
 
-.flowcards-rating-again {
+.sift-rating-again {
   background: var(--color-red);
 }
 
-.flowcards-rating-hard {
+.sift-rating-hard {
   background: var(--color-orange);
 }
 
-.flowcards-rating-good {
+.sift-rating-good {
   background: var(--color-blue);
 }
 
-.flowcards-rating-easy {
+.sift-rating-easy {
   background: var(--color-green);
 }
 
-.flowcards-rating-new {
+.sift-rating-new {
   background: var(--background-modifier-border);
   color: var(--text-muted);
 }
 
-.flowcards-deck-none {
+.sift-deck-none {
   font-size: 0.8em;
   color: var(--text-faint);
 }
 
-.flowcards-deck-total {
+.sift-deck-total {
   font-size: 0.8em;
   color: var(--text-muted);
 }
 
-.flowcards-confirm-row {
+.sift-confirm-row {
   display: flex;
   gap: 0.5em;
   margin-top: 1em;

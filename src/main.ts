@@ -19,7 +19,7 @@ import {
   CardState,
   ClozeScope,
   DEFAULT_SETTINGS,
-  FlowcardsSettings,
+  SiftSettings,
   PersistedData,
   Rating,
   StateMap,
@@ -52,10 +52,10 @@ import { Key, t } from "./i18n";
 // are all pure and tested elsewhere; ReviewModal/DecksView below only wire
 // DOM to it.
 
-const VIEW_TYPE_DECKS = "flowcards-decks-view";
+const VIEW_TYPE_DECKS = "sift-decks-view";
 
-export default class FlowcardsPlugin extends Plugin {
-  settings: FlowcardsSettings = DEFAULT_SETTINGS;
+export default class SiftPlugin extends Plugin {
+  settings: SiftSettings = DEFAULT_SETTINGS;
   states: StateMap = {};
   /** Read once at onload() from moment.locale() -- Obsidian bundles moment
    *  and keeps its locale synced with Settings -> General -> Language, so
@@ -150,14 +150,14 @@ export default class FlowcardsPlugin extends Plugin {
       },
     });
 
-    this.addSettingTab(new FlowcardsSettingTab(this.app, this));
+    this.addSettingTab(new SiftSettingTab(this.app, this));
 
     this.registerView(VIEW_TYPE_DECKS, (leaf) => new DecksView(leaf, this));
-    // Lets a plain Markdown link -- [Decks](obsidian://flowcards-decks) --
+    // Lets a plain Markdown link -- [Decks](obsidian://sift-decks) --
     // open the deck overview from any note (e.g. a daily note), since
     // Obsidian wikilinks can only target real vault files, never a
     // plugin view without file backing.
-    this.registerObsidianProtocolHandler("flowcards-decks", () => void this.activateDecksView());
+    this.registerObsidianProtocolHandler("sift-decks", () => void this.activateDecksView());
 
     this.addRibbonIcon("graduation-cap", t(this.locale, "ribbonOpenDecks"), () => void this.activateDecksView());
 
@@ -297,7 +297,7 @@ export default class FlowcardsPlugin extends Plugin {
   /** Persist settings-tab edits AND reindex the vault with them, so a
    *  changed calloutType/deckTagRoot/etc. takes effect without a manual
    *  "Rebuild index". Called once when the settings tab is closed (see
-   *  FlowcardsSettingTab.hide()), not per keystroke -- rebuildIndex()
+   *  SiftSettingTab.hide()), not per keystroke -- rebuildIndex()
    *  reads every markdown file, too expensive to run on every onChange.
    *  rebuildIndex() already calls save() at the end, persisting both
    *  states and settings in one pass. */
@@ -328,7 +328,7 @@ class ReviewModal extends Modal {
 
   constructor(
     app: App,
-    private plugin: FlowcardsPlugin,
+    private plugin: SiftPlugin,
     due: CardState[],
     cardsByHash: Map<string, Card>,
     private onCloseCallback?: () => void,
@@ -407,9 +407,9 @@ class ReviewModal extends Modal {
       }),
     );
 
-    this.contentEl.createDiv({ cls: "flowcards-context", text: card.context });
+    this.contentEl.createDiv({ cls: "sift-context", text: card.context });
 
-    const frontEl = this.contentEl.createDiv({ cls: "flowcards-front" });
+    const frontEl = this.contentEl.createDiv({ cls: "sift-front" });
     void MarkdownRenderer.render(this.app, card.front, frontEl, card.notePath, this.mdComponent);
 
     if (!this.session.revealed) {
@@ -421,10 +421,10 @@ class ReviewModal extends Modal {
     }
 
     this.contentEl.createEl("hr");
-    const backEl = this.contentEl.createDiv({ cls: "flowcards-back" });
+    const backEl = this.contentEl.createDiv({ cls: "sift-back" });
     void MarkdownRenderer.render(this.app, card.back, backEl, card.notePath, this.mdComponent);
 
-    const ratingRow = this.contentEl.createDiv({ cls: "flowcards-ratings" });
+    const ratingRow = this.contentEl.createDiv({ cls: "sift-ratings" });
     const buttons: [Rating, Key][] = [
       [1, "ratingAgain"],
       [2, "ratingHard"],
@@ -451,7 +451,7 @@ class ReviewModal extends Modal {
 
 /**
  * A normal workspace tab (not a Modal) so it stays open and can be linked
- * to from any note via obsidian://flowcards-decks (registered in onload()).
+ * to from any note via obsidian://sift-decks (registered in onload()).
  * DOM-wiring glue only — counting and deck-tree structure come entirely
  * from decks.ts (buildDeckTree). Picking a node calls
  * plugin.startReview(node.path, onClose), passing this.render as the
@@ -459,7 +459,7 @@ class ReviewModal extends Modal {
  * without needing to reopen or reload this view.
  */
 class DecksView extends ItemView {
-  constructor(leaf: WorkspaceLeaf, private plugin: FlowcardsPlugin) {
+  constructor(leaf: WorkspaceLeaf, private plugin: SiftPlugin) {
     super(leaf);
   }
 
@@ -512,13 +512,13 @@ class DecksView extends ItemView {
       contentEl.createEl("p", { text: t(this.plugin.locale, "decksEmpty") });
       return;
     }
-    const list = contentEl.createDiv({ cls: "flowcards-deck-tree" });
+    const list = contentEl.createDiv({ cls: "sift-deck-tree" });
     this.renderNodes(list, tree, 0);
   };
 
   private renderNodes(container: HTMLElement, nodes: DeckNode[], depth: number) {
     for (const node of nodes) {
-      const row = container.createDiv({ cls: "flowcards-deck-row" });
+      const row = container.createDiv({ cls: "sift-deck-row" });
       row.style.paddingLeft = `${depth * 1.25}em`;
       new ButtonComponent(row)
         .setButtonText(node.name)
@@ -533,22 +533,22 @@ class DecksView extends ItemView {
    *  text label -- categories with zero cards are skipped entirely. */
   private renderBreakdown(container: HTMLElement, breakdown: RatingBreakdown, total: number) {
     const parts: [keyof RatingBreakdown, Key, string][] = [
-      ["again", "ratingAgain", "flowcards-rating-again"],
-      ["hard", "ratingHard", "flowcards-rating-hard"],
-      ["good", "ratingGood", "flowcards-rating-good"],
-      ["easy", "ratingEasy", "flowcards-rating-easy"],
-      ["new", "ratingNew", "flowcards-rating-new"],
+      ["again", "ratingAgain", "sift-rating-again"],
+      ["hard", "ratingHard", "sift-rating-hard"],
+      ["good", "ratingGood", "sift-rating-good"],
+      ["easy", "ratingEasy", "sift-rating-easy"],
+      ["new", "ratingNew", "sift-rating-new"],
     ];
     let anyShown = false;
     for (const [key, labelKey, cls] of parts) {
       const count = breakdown[key];
       if (count === 0) continue;
       const label = t(this.plugin.locale, labelKey);
-      container.createSpan({ cls: ["flowcards-rating-badge", cls], text: `${label} ${count}` });
+      container.createSpan({ cls: ["sift-rating-badge", cls], text: `${label} ${count}` });
       anyShown = true;
     }
-    if (!anyShown) container.createSpan({ cls: "flowcards-deck-none", text: "–" });
-    container.createSpan({ cls: "flowcards-deck-total", text: `| ${total}` });
+    if (!anyShown) container.createSpan({ cls: "sift-deck-none", text: "–" });
+    container.createSpan({ cls: "sift-deck-total", text: `| ${total}` });
   }
 }
 
@@ -562,7 +562,7 @@ class ConfirmResetModal extends Modal {
   onOpen() {
     this.titleEl.setText(t(this.locale, "confirmResetTitle"));
     this.contentEl.createEl("p", { text: t(this.locale, "confirmResetBody") });
-    const row = this.contentEl.createDiv({ cls: "flowcards-confirm-row" });
+    const row = this.contentEl.createDiv({ cls: "sift-confirm-row" });
     new ButtonComponent(row)
       .setButtonText(t(this.locale, "cancel"))
       .onClick(() => this.close());
@@ -576,10 +576,10 @@ class ConfirmResetModal extends Modal {
   }
 }
 
-class FlowcardsSettingTab extends PluginSettingTab {
+class SiftSettingTab extends PluginSettingTab {
   private dirty = false;
 
-  constructor(app: App, private plugin: FlowcardsPlugin) {
+  constructor(app: App, private plugin: SiftPlugin) {
     super(app, plugin);
   }
 
@@ -678,7 +678,7 @@ class FlowcardsSettingTab extends PluginSettingTab {
 
   /** Fires when the user navigates away from this settings tab. Persist +
    *  reindex exactly once here rather than per keystroke/click — see
-   *  FlowcardsPlugin.saveSettings(). No-op if nothing actually changed. */
+   *  SiftPlugin.saveSettings(). No-op if nothing actually changed. */
   hide(): void {
     if (this.dirty) void this.plugin.saveSettings();
   }

@@ -82,7 +82,7 @@ export type StateMap = Record<string, CardState>;
 export interface PersistedData {
   schema: 1;
   states: StateMap;
-  settings: FlowcardsSettings;
+  settings: SiftSettings;
   /** ISO timestamp of the last time a review reminder was shown (see
    *  reminder.ts). Optional for back-compat with data.json files saved
    *  before this field existed. */
@@ -101,7 +101,7 @@ export interface ClozeConfig {
   scope: ClozeScope;
 }
 
-export interface FlowcardsSettings {
+export interface SiftSettings {
   deckTagRoot: string; // tag prefix that marks a note as containing cards, e.g. "flashcards"
   reverseEmoji: string; // marks a card as reversible, e.g. "🔁"
   calloutType: string; // only callouts of this type (case-insensitive) become cards, e.g. "card"
@@ -111,7 +111,7 @@ export interface FlowcardsSettings {
   reminderIntervalDays: number;
 }
 
-export const DEFAULT_SETTINGS: FlowcardsSettings = {
+export const DEFAULT_SETTINGS: SiftSettings = {
   deckTagRoot: "flashcards",
   reverseEmoji: "🔁",
   calloutType: "card",
