@@ -526,7 +526,7 @@ class DecksView extends ItemView {
   private renderNodes(container: HTMLElement, nodes: DeckNode[], depth: number) {
     for (const node of nodes) {
       const row = container.createDiv({ cls: "sift-deck-row" });
-      row.style.paddingLeft = `${depth * 1.25}em`;
+      row.style.setProperty("--sift-depth", String(depth));
       new ButtonComponent(row)
         .setButtonText(node.name)
         .onClick(() => this.plugin.startReview(node.path, this.render));

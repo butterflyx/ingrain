@@ -35,6 +35,7 @@
   flex-wrap: wrap;
   gap: 0.4em;
   margin-top: 0.25em;
+  padding-left: calc(var(--sift-depth, 0) * 1.25em);
 }
 
 .sift-rating-badge {
