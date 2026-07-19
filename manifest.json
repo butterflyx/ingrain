@@ -1,9 +1,9 @@
 {
-  "id": "flowcards",
-  "name": "Flowcards",
+  "id": "sift",
+  "name": "Sift",
   "version": "0.1.0",
   "minAppVersion": "1.5.0",
-  "description": "Reading-flow-first spaced repetition: callouts and inline clozes as cards, hash-based identity, stats in a plugin store.",
+  "description": "Native callouts and highlights become flashcards — your files never know. Spaced repetition without plugin syntax.",
   "author": "butterflyx",
   "authorUrl": "https://github.com/butterflyx",
   "isDesktopOnly": false
