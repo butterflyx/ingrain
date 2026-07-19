@@ -380,7 +380,7 @@ class ReviewModal extends Modal {
   private handleRate(rating: Rating) {
     if (!canRate(this.session)) return;
     const card = this.cardsByHash.get(currentCard(this.session)!.hash);
-    const { session, updatedState } = rate(this.session, rating);
+    const { session, updatedState } = rate(this.session, rating, new Date(), card?.reverseOf);
     this.session = session;
     void this.plugin.recordReview(updatedState.hash, updatedState, card?.reverseOf);
     this.render();

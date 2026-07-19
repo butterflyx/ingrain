@@ -125,6 +125,27 @@ describe("rate", () => {
     expect(JSON.stringify(initial)).toBe(before);
     expect(JSON.stringify(currentCard(s))).toBe(before);
   });
+
+  it("removes the reverse sibling from the remaining queue when reverseOfHash is given", () => {
+    const s = reveal(startSession([state("front"), state("back")]));
+    const { session } = rate(s, 3, now, "back");
+    expect(isComplete(session)).toBe(true);
+    expect(sessionProgress(session)).toEqual({ reviewed: 1, remaining: 0, total: 1 });
+  });
+
+  it("removes the sibling even if it's further ahead in the queue, leaving the rest in order", () => {
+    const s = reveal(startSession([state("front"), state("middle"), state("back")]));
+    const { session } = rate(s, 3, now, "back");
+    expect(currentCard(session)?.hash).toBe("middle");
+    expect(sessionProgress(session)).toEqual({ reviewed: 1, remaining: 1, total: 2 });
+  });
+
+  it("leaves the queue untouched when no reverseOfHash is given", () => {
+    const s = reveal(startSession([state("a"), state("b")]));
+    const { session } = rate(s, 3, now);
+    expect(currentCard(session)?.hash).toBe("b");
+    expect(sessionProgress(session)).toEqual({ reviewed: 1, remaining: 1, total: 2 });
+  });
 });
 
 describe("end-to-end session walks", () => {

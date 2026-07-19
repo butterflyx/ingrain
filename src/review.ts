@@ -67,15 +67,33 @@ export function reveal(session: ReviewSessionState): ReviewSessionState {
  * Throws if !canRate(session) — a caller/programmer-error guard. The Modal
  * only wires rating buttons/keys once canRate() is true, so this should be
  * unreachable through normal UI interaction.
+ *
+ * `reverseOfHash`, if given, is the hash of this card's reverse-pair
+ * sibling (see types.ts Card.reverseOf). Its due date was just pushed into
+ * the future by the caller (main.ts recordReview -> coordinateSiblingDue),
+ * but that only updates the persisted store, not this already-snapshotted
+ * session queue -- so without this, a sibling that was due at session
+ * start would still get presented later in the SAME session. Dropping any
+ * remaining occurrence of it here keeps the session in sync with that
+ * store update. Entries at or before the current index are left alone --
+ * only genuinely upcoming occurrences are removed.
  */
-export function rate(session: ReviewSessionState, rating: Rating, now = new Date()): RateResult {
+export function rate(
+  session: ReviewSessionState,
+  rating: Rating,
+  now = new Date(),
+  reverseOfHash?: string,
+): RateResult {
   if (!canRate(session)) {
     throw new Error(
-      "Flowcards: cannot rate before revealing the answer, or after the session is complete.",
+      "Sift: cannot rate before revealing the answer, or after the session is complete.",
     );
   }
   const state = session.queue[session.index];
   const updatedState = schedule(state, rating, now);
-  const next: ReviewSessionState = { ...session, index: session.index + 1, revealed: false };
+  const queue = reverseOfHash
+    ? session.queue.filter((s, i) => i <= session.index || s.hash !== reverseOfHash)
+    : session.queue;
+  const next: ReviewSessionState = { ...session, queue, index: session.index + 1, revealed: false };
   return { session: next, updatedState };
 }
