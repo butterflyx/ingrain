@@ -1,7 +1,7 @@
 {
-  "name": "flowcards",
+  "name": "sift",
   "version": "0.1.0",
-  "description": "Reading-flow-first spaced repetition for Obsidian (callouts + inline clozes, hash-based card identity).",
+  "description": "Native callouts and highlights become flashcards — your files never know. Spaced repetition without plugin syntax.",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
