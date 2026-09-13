@@ -574,16 +574,27 @@ class ReviewModal extends Modal {
     void MarkdownRenderer.render(this.app, card.back, backEl, card.notePath, this.mdComponent);
 
     const ratingRow = this.contentEl.createDiv({ cls: "ingrain-ratings" });
-    const buttons: [Rating, Key][] = [
-      [1, "ratingAgain"],
-      [2, "ratingHard"],
-      [3, "ratingGood"],
-      [4, "ratingEasy"],
+    const buttons: [Rating, Key, string][] = [
+      [1, "ratingAgain", "ingrain-rating-btn-again"],
+      [2, "ratingHard", "ingrain-rating-btn-hard"],
+      [3, "ratingGood", "ingrain-rating-btn-good"],
+      [4, "ratingEasy", "ingrain-rating-btn-easy"],
     ];
-    for (const [rating, key] of buttons) {
-      new ButtonComponent(ratingRow)
-        .setButtonText(`${t(this.plugin.locale, key)} (${rating})`)
-        .onClick(() => this.handleRate(rating));
+    for (const [rating, key, cls] of buttons) {
+      const label = t(this.plugin.locale, key);
+      const full = `${label} (${rating})`;
+      const btn = new ButtonComponent(ratingRow).setTooltip(full).onClick(() => this.handleRate(rating));
+      btn.buttonEl.addClass(cls);
+      btn.buttonEl.createSpan({ cls: "ingrain-rating-full", text: full });
+      // Narrow-screen fallback (see styles.css): a colored single letter
+      // instead of the full label. aria-hidden so the button's accessible
+      // name always comes from .ingrain-rating-full above, regardless of
+      // which span CSS is currently showing.
+      btn.buttonEl.createSpan({
+        cls: "ingrain-rating-short",
+        text: label.charAt(0).toUpperCase(),
+        attr: { "aria-hidden": "true" },
+      });
     }
   }
 

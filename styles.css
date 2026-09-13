@@ -24,12 +24,50 @@
 
 .ingrain-ratings {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5em;
   margin-top: 1em;
 }
 
 .ingrain-ratings button {
   flex: 1;
+}
+
+.ingrain-rating-short {
+  display: none;
+}
+
+/* Narrow screens (e.g. phones): swap the full "Nochmal (1)" label for a
+   single colored letter, matching DecksView's rating-badge colors, so the
+   row fits without clipping or wrapping to a second line. */
+@media (max-width: 600px) {
+  .ingrain-ratings .ingrain-rating-full {
+    display: none;
+  }
+
+  .ingrain-ratings .ingrain-rating-short {
+    display: inline;
+  }
+
+  .ingrain-ratings button.ingrain-rating-btn-again {
+    background: var(--color-red);
+    color: var(--text-on-accent);
+  }
+
+  .ingrain-ratings button.ingrain-rating-btn-hard {
+    background: var(--color-orange);
+    color: var(--text-on-accent);
+  }
+
+  .ingrain-ratings button.ingrain-rating-btn-good {
+    background: var(--color-blue);
+    color: var(--text-on-accent);
+  }
+
+  .ingrain-ratings button.ingrain-rating-btn-easy {
+    background: var(--color-green);
+    color: var(--text-on-accent);
+  }
 }
 
 .ingrain-deck-tree {
