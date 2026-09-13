@@ -86,6 +86,33 @@ export function dueCards(store: StateMap, now = new Date()): CardState[] {
     .sort((a, b) => new Date(a.due).getTime() - new Date(b.due).getTime());
 }
 
+/** Randomize order WITHIN each calendar day of `due` (UTC), while keeping
+ *  earlier days strictly before later days -- so cards overdue since an
+ *  earlier day still surface before today's, but cards that became due
+ *  together (e.g. reviewed in the same past sitting) don't repeat in the
+ *  exact same order every session. Never mutates the input; `rng` is
+ *  injectable for deterministic tests, defaulting to Math.random. */
+export function shuffleDueCards(cards: CardState[], rng: () => number = Math.random): CardState[] {
+  const buckets = new Map<string, CardState[]>();
+  for (const card of cards) {
+    const day = card.due.slice(0, 10);
+    const bucket = buckets.get(day);
+    if (bucket) bucket.push(card);
+    else buckets.set(day, [card]);
+  }
+
+  const result: CardState[] = [];
+  for (const day of Array.from(buckets.keys()).sort()) {
+    const bucket = buckets.get(day)!;
+    for (let i = bucket.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [bucket[i], bucket[j]] = [bucket[j], bucket[i]];
+    }
+    result.push(...bucket);
+  }
+  return result;
+}
+
 /** Pick whichever of two CardStates for the same hash represents more
  *  progress: more reviewLog entries wins (a review always appends exactly
  *  one, so it's a clean monotonic signal); tied -> later lastReviewed wins

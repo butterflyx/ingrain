@@ -32,6 +32,7 @@ import {
   sweepOrphans,
   dueCards,
   mergeStates,
+  shuffleDueCards,
 } from "./reconcile";
 import {
   computeFingerprint,
@@ -308,7 +309,7 @@ export default class IngrainPlugin extends Plugin {
   }
 
   startReview(deckPath?: string, onClose?: () => void) {
-    const due = filterByDeck(dueCards(this.states), this.cardCache, deckPath);
+    const due = shuffleDueCards(filterByDeck(dueCards(this.states), this.cardCache, deckPath));
     if (!due.length) {
       new Notice(
         deckPath

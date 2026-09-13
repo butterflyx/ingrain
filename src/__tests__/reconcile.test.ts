@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { reconcileNote, sweepOrphans, renameNotePath, mergeStates } from "../reconcile";
-import { Card, StateMap } from "../types";
+import { reconcileNote, sweepOrphans, renameNotePath, mergeStates, shuffleDueCards } from "../reconcile";
+import { Card, CardState, StateMap } from "../types";
 import { initialState, schedule } from "../scheduler";
 
 function card(hash: string, notePath: string): Card {
@@ -131,5 +131,65 @@ describe("mergeStates", () => {
 
     expect(result).not.toBe(local);
     expect(result).not.toBe(incoming);
+  });
+});
+
+function stateAt(hash: string, due: string): CardState {
+  return { ...initialState(hash, "n.md", now), due };
+}
+
+const constantRng = (value: number) => () => value;
+
+describe("shuffleDueCards", () => {
+  it("keeps every earlier-day card before every later-day card, for any rng", () => {
+    const dayOne = [stateAt("a", "2026-07-10T08:00:00Z"), stateAt("b", "2026-07-10T09:00:00Z")];
+    const dayTwo = [stateAt("c", "2026-07-11T08:00:00Z"), stateAt("d", "2026-07-11T09:00:00Z")];
+    const input = [...dayOne, ...dayTwo];
+
+    for (const rng of [constantRng(0), constantRng(0.999999), Math.random]) {
+      const result = shuffleDueCards(input, rng);
+      const dayOneHashes = new Set(dayOne.map((s) => s.hash));
+      const lastDayOneIndex = Math.max(...result.map((s, i) => (dayOneHashes.has(s.hash) ? i : -1)));
+      const firstDayTwoIndex = Math.min(
+        ...result.map((s, i) => (dayOneHashes.has(s.hash) ? Infinity : i)),
+      );
+      expect(lastDayOneIndex).toBeLessThan(firstDayTwoIndex);
+    }
+  });
+
+  it("reorders same-day cards under a controlled rng", () => {
+    const input = [
+      stateAt("a", "2026-07-10T08:00:00Z"),
+      stateAt("b", "2026-07-10T09:00:00Z"),
+      stateAt("c", "2026-07-10T10:00:00Z"),
+    ];
+    const result = shuffleDueCards(input, constantRng(0));
+    expect(result.map((s) => s.hash)).not.toEqual(["a", "b", "c"]);
+  });
+
+  it("produces the exact Fisher-Yates permutation for a known rng sequence", () => {
+    const input = [
+      stateAt("a", "2026-07-10T08:00:00Z"),
+      stateAt("b", "2026-07-10T09:00:00Z"),
+      stateAt("c", "2026-07-10T10:00:00Z"),
+    ];
+    const result = shuffleDueCards(input, constantRng(0));
+    expect(result.map((s) => s.hash)).toEqual(["b", "c", "a"]);
+  });
+
+  it("never mutates the input array", () => {
+    const input = [stateAt("a", "2026-07-10T08:00:00Z"), stateAt("b", "2026-07-10T09:00:00Z")];
+    const before = JSON.stringify(input);
+
+    const result = shuffleDueCards(input, constantRng(0));
+
+    expect(JSON.stringify(input)).toBe(before);
+    expect(result).not.toBe(input);
+  });
+
+  it("is a no-op for empty and singleton input", () => {
+    expect(shuffleDueCards([])).toEqual([]);
+    const single = [stateAt("a", "2026-07-10T08:00:00Z")];
+    expect(shuffleDueCards(single, constantRng(0))).toEqual(single);
   });
 });
