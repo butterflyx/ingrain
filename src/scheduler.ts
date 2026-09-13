@@ -64,10 +64,22 @@ export function isDue(state: CardState, now = new Date()): boolean {
   return new Date(state.due).getTime() <= now.getTime();
 }
 
+/** Push every sibling's due date to match the just-reviewed card's new due
+ *  date, so none of them shows up as due again in the same/next session
+ *  before the user has forgotten what reviewing this card just revealed
+ *  about them -- a reverse pair's other side, or the other cloze cards from
+ *  the same source block (see types.ts Card.reverseOf / Card.siblingGroup,
+ *  decks.ts siblingHashesOf()). Each sibling's own ease/reps/lapses/
+ *  reviewLog is left untouched; only `due` is coordinated. Returns NEW
+ *  CardState objects (never mutates input). */
+export function coordinateSiblingsDue(siblings: CardState[], updatedState: CardState): CardState[] {
+  return siblings.map((s) => ({ ...s, due: updatedState.due }));
+}
+
 /** Decide a reverse pair's sibling's new due date after this side was just
  *  reviewed. v1: mirror the same due timestamp, so the untested side won't
  *  also show up as due in the same/next session -- its own ease/reps/
  *  lapses/reviewLog stay untouched, only scheduling timing is coordinated. */
 export function coordinateSiblingDue(sibling: CardState, updatedState: CardState): CardState {
-  return { ...sibling, due: updatedState.due };
+  return coordinateSiblingsDue([sibling], updatedState)[0];
 }

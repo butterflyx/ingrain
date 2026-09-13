@@ -1,82 +1,90 @@
-.sift-context {
+.ingrain-context {
   font-size: 0.8em;
   color: var(--text-faint);
   margin-bottom: 0.5em;
 }
 
-.sift-front {
+.ingrain-clickable {
+  cursor: pointer;
+}
+
+.ingrain-clickable:hover {
+  text-decoration: underline;
+}
+
+.ingrain-front {
   font-size: 1.1em;
   margin-bottom: 1em;
 }
 
-.sift-back {
+.ingrain-back {
   margin: 1em 0;
   color: var(--text-muted);
 }
 
-.sift-ratings {
+.ingrain-ratings {
   display: flex;
   gap: 0.5em;
   margin-top: 1em;
 }
 
-.sift-ratings button {
+.ingrain-ratings button {
   flex: 1;
 }
 
-.sift-deck-tree {
+.ingrain-deck-tree {
   margin-top: 1em;
   max-width: 40em;
 }
 
-.sift-deck-row {
+.ingrain-deck-row {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 0.4em;
   margin-top: 0.25em;
-  padding-left: calc(var(--sift-depth, 0) * 1.25em);
+  padding-left: calc(var(--ingrain-depth, 0) * 1.25em);
 }
 
-.sift-rating-badge {
+.ingrain-rating-badge {
   padding: 0.05em 0.5em;
   border-radius: 0.75em;
   font-size: 0.8em;
   color: var(--text-on-accent);
 }
 
-.sift-rating-again {
+.ingrain-rating-again {
   background: var(--color-red);
 }
 
-.sift-rating-hard {
+.ingrain-rating-hard {
   background: var(--color-orange);
 }
 
-.sift-rating-good {
+.ingrain-rating-good {
   background: var(--color-blue);
 }
 
-.sift-rating-easy {
+.ingrain-rating-easy {
   background: var(--color-green);
 }
 
-.sift-rating-new {
+.ingrain-rating-new {
   background: var(--background-modifier-border);
   color: var(--text-muted);
 }
 
-.sift-deck-none {
+.ingrain-deck-none {
   font-size: 0.8em;
   color: var(--text-faint);
 }
 
-.sift-deck-total {
+.ingrain-deck-total {
   font-size: 0.8em;
   color: var(--text-muted);
 }
 
-.sift-confirm-row {
+.ingrain-confirm-row {
   display: flex;
   gap: 0.5em;
   margin-top: 1em;

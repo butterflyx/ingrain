@@ -19,7 +19,7 @@ import {
   CardState,
   ClozeScope,
   DEFAULT_SETTINGS,
-  SiftSettings,
+  IngrainSettings,
   PersistedData,
   Rating,
   StateMap,
@@ -42,8 +42,8 @@ import {
   sessionProgress,
   startSession,
 } from "./review";
-import { coordinateSiblingDue } from "./scheduler";
-import { DeckNode, RatingBreakdown, buildDeckTree, filterByDeck } from "./decks";
+import { coordinateSiblingsDue } from "./scheduler";
+import { DeckNode, RatingBreakdown, buildDeckTree, filterByDeck, siblingHashesOf } from "./decks";
 import { shouldShowReminder } from "./reminder";
 import { Key, t } from "./i18n";
 
@@ -52,10 +52,10 @@ import { Key, t } from "./i18n";
 // are all pure and tested elsewhere; ReviewModal/DecksView below only wire
 // DOM to it.
 
-const VIEW_TYPE_DECKS = "sift-decks-view";
+const VIEW_TYPE_DECKS = "ingrain-decks-view";
 
-export default class SiftPlugin extends Plugin {
-  settings: SiftSettings = DEFAULT_SETTINGS;
+export default class IngrainPlugin extends Plugin {
+  settings: IngrainSettings = DEFAULT_SETTINGS;
   states: StateMap = {};
   /** Read once at onload() from moment.locale() -- Obsidian bundles moment
    *  and keeps its locale synced with Settings -> General -> Language, so
@@ -124,14 +124,14 @@ export default class SiftPlugin extends Plugin {
       },
     });
 
-    this.addSettingTab(new SiftSettingTab(this.app, this));
+    this.addSettingTab(new IngrainSettingTab(this.app, this));
 
     this.registerView(VIEW_TYPE_DECKS, (leaf) => new DecksView(leaf, this));
-    // Lets a plain Markdown link -- [Decks](obsidian://sift-decks) --
+    // Lets a plain Markdown link -- [Decks](obsidian://ingrain-decks) --
     // open the deck overview from any note (e.g. a daily note), since
     // Obsidian wikilinks can only target real vault files, never a
     // plugin view without file backing.
-    this.registerObsidianProtocolHandler("sift-decks", () => void this.activateDecksView());
+    this.registerObsidianProtocolHandler("ingrain-decks", () => void this.activateDecksView());
 
     this.addRibbonIcon("graduation-cap", t(this.locale, "ribbonOpenDecks"), () => void this.activateDecksView());
 
@@ -269,14 +269,19 @@ export default class SiftPlugin extends Plugin {
   }
 
   /** Persist the result of a single review. Write-through (not batched) so
-   *  progress survives an app kill mid-session on mobile. If reverseOf
-   *  names a sibling that still exists in the store, its due date is
-   *  coordinated too (see scheduler.ts coordinateSiblingDue()) so it
-   *  won't also show up as due in the same/next session. */
-  async recordReview(hash: string, state: CardState, reverseOf?: string): Promise<void> {
+   *  progress survives an app kill mid-session on mobile. Any scheduling
+   *  siblings (see decks.ts siblingHashesOf()) still present in the store
+   *  get their due date coordinated too (scheduler.ts
+   *  coordinateSiblingsDue()) so they won't also show up as due in the
+   *  same/next session. */
+  async recordReview(hash: string, state: CardState, siblingHashes: readonly string[] = []): Promise<void> {
     let next: StateMap = { ...this.states, [hash]: state };
-    const sibling = reverseOf ? next[reverseOf] : undefined;
-    if (sibling) next = { ...next, [reverseOf!]: coordinateSiblingDue(sibling, state) };
+    const existingSiblings = siblingHashes
+      .map((h) => next[h])
+      .filter((s): s is CardState => s !== undefined);
+    if (existingSiblings.length) {
+      for (const s of coordinateSiblingsDue(existingSiblings, state)) next = { ...next, [s.hash]: s };
+    }
     this.states = next;
     await this.save();
     this.notifyDecksChanged();
@@ -304,7 +309,7 @@ export default class SiftPlugin extends Plugin {
   /** Persist settings-tab edits AND reindex the vault with them, so a
    *  changed calloutType/deckTagRoot/etc. takes effect without a manual
    *  "Rebuild index". Called once when the settings tab is closed (see
-   *  SiftSettingTab.hide()), not per keystroke -- rebuildIndex()
+   *  IngrainSettingTab.hide()), not per keystroke -- rebuildIndex()
    *  reads every markdown file, too expensive to run on every onChange.
    *  rebuildIndex() already calls save() at the end, persisting both
    *  states and settings in one pass. */
@@ -335,7 +340,7 @@ class ReviewModal extends Modal {
 
   constructor(
     app: App,
-    private plugin: SiftPlugin,
+    private plugin: IngrainPlugin,
     due: CardState[],
     cardsByHash: Map<string, Card>,
     private onCloseCallback?: () => void,
@@ -387,9 +392,15 @@ class ReviewModal extends Modal {
   private handleRate(rating: Rating) {
     if (!canRate(this.session)) return;
     const card = this.cardsByHash.get(currentCard(this.session)!.hash);
-    const { session, updatedState } = rate(this.session, rating, new Date(), card?.reverseOf);
+    // Deliberately consults the plugin's FULL cardCache (every parsed card,
+    // due or not), NOT this.cardsByHash (a due-only snapshot at session
+    // start) -- a cloze sibling group can easily contain members that
+    // aren't currently due, and they'd be silently missed if we scanned
+    // only the session's own snapshot.
+    const siblingHashes = card ? siblingHashesOf(card, this.plugin.cardCache) : [];
+    const { session, updatedState } = rate(this.session, rating, new Date(), siblingHashes);
     this.session = session;
-    void this.plugin.recordReview(updatedState.hash, updatedState, card?.reverseOf);
+    void this.plugin.recordReview(updatedState.hash, updatedState, siblingHashes);
     this.render();
   }
 
@@ -414,9 +425,26 @@ class ReviewModal extends Modal {
       }),
     );
 
-    this.contentEl.createDiv({ cls: "sift-context", text: card.context });
+    const contextEl = this.contentEl.createDiv({
+      cls: "ingrain-context ingrain-clickable",
+      text: card.context,
+      attr: {
+        title: t(this.plugin.locale, "reviewOpenSourceNote"),
+        role: "button",
+        tabindex: "0",
+      },
+    });
+    const openSourceNote = () =>
+      void this.app.workspace.openLinkText(`${card.notePath}#${card.context}`, card.notePath);
+    contextEl.addEventListener("click", openSourceNote);
+    contextEl.addEventListener("keydown", (evt) => {
+      if (evt.key === "Enter" || evt.key === " ") {
+        evt.preventDefault();
+        openSourceNote();
+      }
+    });
 
-    const frontEl = this.contentEl.createDiv({ cls: "sift-front" });
+    const frontEl = this.contentEl.createDiv({ cls: "ingrain-front" });
     void MarkdownRenderer.render(this.app, card.front, frontEl, card.notePath, this.mdComponent);
 
     if (!this.session.revealed) {
@@ -428,10 +456,10 @@ class ReviewModal extends Modal {
     }
 
     this.contentEl.createEl("hr");
-    const backEl = this.contentEl.createDiv({ cls: "sift-back" });
+    const backEl = this.contentEl.createDiv({ cls: "ingrain-back" });
     void MarkdownRenderer.render(this.app, card.back, backEl, card.notePath, this.mdComponent);
 
-    const ratingRow = this.contentEl.createDiv({ cls: "sift-ratings" });
+    const ratingRow = this.contentEl.createDiv({ cls: "ingrain-ratings" });
     const buttons: [Rating, Key][] = [
       [1, "ratingAgain"],
       [2, "ratingHard"],
@@ -458,7 +486,7 @@ class ReviewModal extends Modal {
 
 /**
  * A normal workspace tab (not a Modal) so it stays open and can be linked
- * to from any note via obsidian://sift-decks (registered in onload()).
+ * to from any note via obsidian://ingrain-decks (registered in onload()).
  * DOM-wiring glue only — counting and deck-tree structure come entirely
  * from decks.ts (buildDeckTree). Picking a node calls
  * plugin.startReview(node.path, onClose), passing this.render as the
@@ -466,7 +494,7 @@ class ReviewModal extends Modal {
  * without needing to reopen or reload this view.
  */
 class DecksView extends ItemView {
-  constructor(leaf: WorkspaceLeaf, private plugin: SiftPlugin) {
+  constructor(leaf: WorkspaceLeaf, private plugin: IngrainPlugin) {
     super(leaf);
   }
 
@@ -519,14 +547,14 @@ class DecksView extends ItemView {
       contentEl.createEl("p", { text: t(this.plugin.locale, "decksEmpty") });
       return;
     }
-    const list = contentEl.createDiv({ cls: "sift-deck-tree" });
+    const list = contentEl.createDiv({ cls: "ingrain-deck-tree" });
     this.renderNodes(list, tree, 0);
   };
 
   private renderNodes(container: HTMLElement, nodes: DeckNode[], depth: number) {
     for (const node of nodes) {
-      const row = container.createDiv({ cls: "sift-deck-row" });
-      row.style.setProperty("--sift-depth", String(depth));
+      const row = container.createDiv({ cls: "ingrain-deck-row" });
+      row.style.setProperty("--ingrain-depth", String(depth));
       new ButtonComponent(row)
         .setButtonText(node.name)
         .onClick(() => this.plugin.startReview(node.path, this.render));
@@ -540,22 +568,22 @@ class DecksView extends ItemView {
    *  text label -- categories with zero cards are skipped entirely. */
   private renderBreakdown(container: HTMLElement, breakdown: RatingBreakdown, total: number) {
     const parts: [keyof RatingBreakdown, Key, string][] = [
-      ["again", "ratingAgain", "sift-rating-again"],
-      ["hard", "ratingHard", "sift-rating-hard"],
-      ["good", "ratingGood", "sift-rating-good"],
-      ["easy", "ratingEasy", "sift-rating-easy"],
-      ["new", "ratingNew", "sift-rating-new"],
+      ["again", "ratingAgain", "ingrain-rating-again"],
+      ["hard", "ratingHard", "ingrain-rating-hard"],
+      ["good", "ratingGood", "ingrain-rating-good"],
+      ["easy", "ratingEasy", "ingrain-rating-easy"],
+      ["new", "ratingNew", "ingrain-rating-new"],
     ];
     let anyShown = false;
     for (const [key, labelKey, cls] of parts) {
       const count = breakdown[key];
       if (count === 0) continue;
       const label = t(this.plugin.locale, labelKey);
-      container.createSpan({ cls: ["sift-rating-badge", cls], text: `${label} ${count}` });
+      container.createSpan({ cls: ["ingrain-rating-badge", cls], text: `${label} ${count}` });
       anyShown = true;
     }
-    if (!anyShown) container.createSpan({ cls: "sift-deck-none", text: "–" });
-    container.createSpan({ cls: "sift-deck-total", text: `| ${total}` });
+    if (!anyShown) container.createSpan({ cls: "ingrain-deck-none", text: "–" });
+    container.createSpan({ cls: "ingrain-deck-total", text: `| ${total}` });
   }
 }
 
@@ -569,7 +597,7 @@ class ConfirmResetModal extends Modal {
   onOpen() {
     this.titleEl.setText(t(this.locale, "confirmResetTitle"));
     this.contentEl.createEl("p", { text: t(this.locale, "confirmResetBody") });
-    const row = this.contentEl.createDiv({ cls: "sift-confirm-row" });
+    const row = this.contentEl.createDiv({ cls: "ingrain-confirm-row" });
     new ButtonComponent(row)
       .setButtonText(t(this.locale, "cancel"))
       .onClick(() => this.close());
@@ -583,10 +611,10 @@ class ConfirmResetModal extends Modal {
   }
 }
 
-class SiftSettingTab extends PluginSettingTab {
+class IngrainSettingTab extends PluginSettingTab {
   private dirty = false;
 
-  constructor(app: App, private plugin: SiftPlugin) {
+  constructor(app: App, private plugin: IngrainPlugin) {
     super(app, plugin);
   }
 
@@ -685,7 +713,7 @@ class SiftSettingTab extends PluginSettingTab {
 
   /** Fires when the user navigates away from this settings tab. Persist +
    *  reindex exactly once here rather than per keystroke/click — see
-   *  SiftPlugin.saveSettings(). No-op if nothing actually changed. */
+   *  IngrainPlugin.saveSettings(). No-op if nothing actually changed. */
   hide(): void {
     if (this.dirty) void this.plugin.saveSettings();
   }

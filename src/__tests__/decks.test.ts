@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { buildDeckTree, filterByDeck } from "../decks";
+import { buildDeckTree, filterByDeck, siblingHashesOf } from "../decks";
 import { initialState, schedule } from "../scheduler";
 import { Card, Rating, StateMap } from "../types";
 
 const now = new Date("2026-07-13T00:00:00Z");
 
-function card(hash: string, decks: string[]): Card {
+function card(hash: string, decks: string[], extra: Partial<Card> = {}): Card {
   return {
     hash,
     notePath: "n.md",
@@ -17,6 +17,7 @@ function card(hash: string, decks: string[]): Card {
     reverse: false,
     sourceBlock: "src",
     context: "note",
+    ...extra,
   };
 }
 
@@ -147,6 +148,47 @@ describe("buildDeckTree", () => {
     const tree = buildDeckTree(states, cardsByHash, now);
     expect(tree[0].dueByRating).toEqual({ new: 0, again: 0, hard: 0, good: 0, easy: 0 });
   });
+
+  it("a cloze sibling group of 3 due cards counts as ONE learning unit", () => {
+    const states: StateMap = { a: dueState("a"), b: dueState("b"), c: dueState("c") };
+    const cardsByHash = {
+      a: card("a", ["flashcards/x"], { kind: "cloze", siblingGroup: "g1" }),
+      b: card("b", ["flashcards/x"], { kind: "cloze", siblingGroup: "g1" }),
+      c: card("c", ["flashcards/x"], { kind: "cloze", siblingGroup: "g1" }),
+    };
+    const tree = buildDeckTree(states, cardsByHash, now);
+    expect(tree[0]).toMatchObject({ dueCount: 1, totalCount: 1 });
+    expect(tree[0].dueByRating).toEqual({ new: 1, again: 0, hard: 0, good: 0, easy: 0 });
+  });
+
+  it("a reverse Q&A pair, both due, counts as ONE learning unit", () => {
+    const states: StateMap = { front: dueState("front"), back: dueState("back") };
+    const cardsByHash = {
+      front: card("front", ["flashcards/x"], { reverseOf: "back" }),
+      back: card("back", ["flashcards/x"], { reverseOf: "front" }),
+    };
+    const tree = buildDeckTree(states, cardsByHash, now);
+    expect(tree[0]).toMatchObject({ dueCount: 1, totalCount: 1 });
+  });
+
+  it("solo cards plus one sibling group add up correctly", () => {
+    const states: StateMap = {
+      a: dueState("a"),
+      b: dueState("b"),
+      c: dueState("c"),
+      d: dueState("d"),
+      e: dueState("e"),
+    };
+    const cardsByHash = {
+      a: card("a", ["flashcards/x"]),
+      b: card("b", ["flashcards/x"]),
+      c: card("c", ["flashcards/x"], { kind: "cloze", siblingGroup: "g1" }),
+      d: card("d", ["flashcards/x"], { kind: "cloze", siblingGroup: "g1" }),
+      e: card("e", ["flashcards/x"], { kind: "cloze", siblingGroup: "g1" }),
+    };
+    const tree = buildDeckTree(states, cardsByHash, now);
+    expect(tree[0]).toMatchObject({ dueCount: 3, totalCount: 3 }); // a, b, {c,d,e}
+  });
 });
 
 describe("filterByDeck", () => {
@@ -172,5 +214,43 @@ describe("filterByDeck", () => {
     const multiCards = { ...cardsByHash, a: card("a", ["flashcards/biology", "flashcards/spanish"]) };
     const result = filterByDeck(Object.values(multi), multiCards, "flashcards/spanish");
     expect(result.map((s) => s.hash)).toContain("a");
+  });
+});
+
+describe("siblingHashesOf", () => {
+  it("returns [reverseOf] for a reverse-pair card", () => {
+    const front = card("front", ["flashcards"], { reverseOf: "back" });
+    const back = card("back", ["flashcards"], { reverseOf: "front" });
+    const cardsByHash = { front, back };
+    expect(siblingHashesOf(front, cardsByHash)).toEqual(["back"]);
+  });
+
+  it("returns every other hash sharing the same siblingGroup + notePath for a cloze card", () => {
+    const cardsByHash = {
+      c1: card("c1", ["flashcards"], { kind: "cloze", siblingGroup: "g1" }),
+      c2: card("c2", ["flashcards"], { kind: "cloze", siblingGroup: "g1" }),
+      c3: card("c3", ["flashcards"], { kind: "cloze", siblingGroup: "g1" }),
+      unrelated: card("unrelated", ["flashcards"], { kind: "cloze", siblingGroup: "g2" }),
+    };
+    const result = siblingHashesOf(cardsByHash.c1, cardsByHash);
+    expect(result.sort()).toEqual(["c2", "c3"]);
+  });
+
+  it("returns [] for a card with neither reverseOf nor siblingGroup", () => {
+    const plain = card("plain", ["flashcards"]);
+    expect(siblingHashesOf(plain, { plain })).toEqual([]);
+  });
+
+  it("does not cross notePath boundaries for cloze siblings", () => {
+    const cardsByHash = {
+      c1: card("c1", ["flashcards"], { kind: "cloze", siblingGroup: "g1", notePath: "a.md" }),
+      c2: card("c2", ["flashcards"], { kind: "cloze", siblingGroup: "g1", notePath: "b.md" }),
+    };
+    expect(siblingHashesOf(cardsByHash.c1, cardsByHash)).toEqual([]);
+  });
+
+  it("returns [] when no other card shares the siblingGroup", () => {
+    const solo = card("solo", ["flashcards"], { kind: "cloze", siblingGroup: "g1" });
+    expect(siblingHashesOf(solo, { solo })).toEqual([]);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { initialState, schedule, isDue, coordinateSiblingDue } from "../scheduler";
+import { initialState, schedule, isDue, coordinateSiblingDue, coordinateSiblingsDue } from "../scheduler";
 
 const now = new Date("2026-07-13T00:00:00Z");
 
@@ -73,5 +73,42 @@ describe("coordinateSiblingDue", () => {
     coordinateSiblingDue(sibling, updated);
     expect(JSON.stringify(sibling)).toBe(siblingBefore);
     expect(JSON.stringify(updated)).toBe(updatedBefore);
+  });
+});
+
+describe("coordinateSiblingsDue", () => {
+  it("sets every sibling's due to the just-reviewed card's new due", () => {
+    const siblings = [
+      initialState("sib1", "n.md", now),
+      initialState("sib2", "n.md", now),
+      initialState("sib3", "n.md", now),
+    ];
+    const updated = schedule(initialState("main", "n.md", now), 3, now);
+    const result = coordinateSiblingsDue(siblings, updated);
+    expect(result.every((s) => s.due === updated.due)).toBe(true);
+  });
+
+  it("leaves each sibling's own scheduling history untouched", () => {
+    let sib1 = initialState("sib1", "n.md", now);
+    sib1 = schedule(sib1, 4, now);
+    const sib2 = initialState("sib2", "n.md", now);
+    const updated = schedule(initialState("main", "n.md", now), 1, now);
+    const [r1, r2] = coordinateSiblingsDue([sib1, sib2], updated);
+    expect(r1.ease).toBe(sib1.ease);
+    expect(r1.reviewLog).toEqual(sib1.reviewLog);
+    expect(r2.ease).toBe(sib2.ease);
+  });
+
+  it("does not mutate any input", () => {
+    const siblings = [initialState("sib1", "n.md", now), initialState("sib2", "n.md", now)];
+    const updated = schedule(initialState("main", "n.md", now), 3, now);
+    const before = siblings.map((s) => JSON.stringify(s));
+    coordinateSiblingsDue(siblings, updated);
+    siblings.forEach((s, i) => expect(JSON.stringify(s)).toBe(before[i]));
+  });
+
+  it("returns [] given an empty siblings array", () => {
+    const updated = schedule(initialState("main", "n.md", now), 3, now);
+    expect(coordinateSiblingsDue([], updated)).toEqual([]);
   });
 });

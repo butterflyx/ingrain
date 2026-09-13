@@ -291,6 +291,18 @@ describe("card context (nearest heading)", () => {
     const cards = parseNote(md, "n.md", S);
     expect(cards[0].context).toBe("Geography");
   });
+
+  it("a cloze card in a titled callout gets the callout title appended to the heading", () => {
+    const md = `#flashcards\n\n## Cell biology\n\n> [!card] Mitosis\n> The cell splits into ==two== daughter cells.`;
+    const cards = parseNote(md, "n.md", S);
+    expect(cards[0].context).toBe("Cell biology > Mitosis");
+  });
+
+  it("a cloze card in an untitled callout keeps the bare heading (no empty breadcrumb)", () => {
+    const md = `#flashcards\n\n## Cell biology\n\n> [!card]\n> The cell splits into ==two== daughter cells.`;
+    const cards = parseNote(md, "n.md", S);
+    expect(cards[0].context).toBe("Cell biology");
+  });
 });
 
 describe("parseNote — inline clozes", () => {
@@ -307,6 +319,76 @@ describe("parseNote — inline clozes", () => {
     const md = `#flashcards\n\nBrazilians speak ==Portuguese==^[language].`;
     const cards = parseNote(md, "n.md", S);
     expect(cards[0].front).toContain("[language]");
+  });
+});
+
+describe("cloze sibling grouping", () => {
+  it("independently seq-grouped clozes in one callout all share one siblingGroup (OSI layers)", () => {
+    const md = `#flashcards
+
+> [!card] OSI layers
+> - Layer 1 · ==Physical==[^1] – ==adapters, hubs==[^1]
+> - Layer 2 · ==Data Link==[^2] – ==switches, bridges==[^2]
+> - Layer 3 · ==Network==[^3] – ==routers==[^3]`;
+    const cards = parseNote(md, "n.md", S);
+    expect(cards).toHaveLength(3);
+    const groups = new Set(cards.map((c) => c.siblingGroup));
+    expect(groups.size).toBe(1);
+    expect(cards[0].siblingGroup).toBeDefined();
+  });
+
+  it("independent un-seq'd clozes in one callout all share one siblingGroup (mnemonic)", () => {
+    const md = `#flashcards\n\n> [!card] Datagram mnemonic\n> ==Data== is ==segmented== into ==Packets==.`;
+    const cards = parseNote(md, "n.md", S);
+    expect(cards).toHaveLength(3);
+    const groups = new Set(cards.map((c) => c.siblingGroup));
+    expect(groups.size).toBe(1);
+    expect(cards[0].siblingGroup).toBeDefined();
+  });
+
+  it("counter-example: clozes sharing the SAME seq collapse into one card with no siblingGroup", () => {
+    const md = `#flashcards\n\n> [!card] Mnemonic\n> ==Some==[^1] ==People==[^1] ==Fear==[^1] ==Birthdays==[^1]`;
+    const cards = parseNote(md, "n.md", S);
+    expect(cards).toHaveLength(1);
+    expect(cards[0].siblingGroup).toBeUndefined();
+  });
+
+  it("a lone cloze in a block has no siblingGroup", () => {
+    const md = `#flashcards\n\n> [!card] Term\n> The answer is ==42==.`;
+    const cards = parseNote(md, "n.md", S);
+    expect(cards).toHaveLength(1);
+    expect(cards[0].siblingGroup).toBeUndefined();
+  });
+
+  it("two separate callouts get different siblingGroup values", () => {
+    const md = `#flashcards
+
+> [!card] First
+> ==A== and ==B==.
+
+> [!card] Second
+> ==C== and ==D==.`;
+    const cards = parseNote(md, "n.md", S);
+    expect(cards).toHaveLength(4);
+    const groupsFirst = new Set(cards.slice(0, 2).map((c) => c.siblingGroup));
+    const groupsSecond = new Set(cards.slice(2, 4).map((c) => c.siblingGroup));
+    expect(groupsFirst.size).toBe(1);
+    expect(groupsSecond.size).toBe(1);
+    expect([...groupsFirst][0]).not.toBe([...groupsSecond][0]);
+  });
+
+  it("multi-cloze siblings outside a callout also share a siblingGroup", () => {
+    const md = `#flashcards\n\nThe ==physical== layer moves ==bits==.`;
+    const cards = parseNote(md, "n.md", S);
+    expect(cards).toHaveLength(2);
+    expect(cards[0].siblingGroup).toBeDefined();
+    expect(cards[0].siblingGroup).toBe(cards[1].siblingGroup);
+  });
+
+  it("callout-qa cards never have a siblingGroup", () => {
+    const md = `#flashcards\n\n> [!card] Term\n> Definition`;
+    const cards = parseNote(md, "n.md", S);
+    expect(cards[0].siblingGroup).toBeUndefined();
   });
 });
 

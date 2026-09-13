@@ -46,8 +46,24 @@ export interface Card {
   seq?: string;
   /** Raw source block the card was derived from. Basis for hashing + locating. */
   sourceBlock: string;
+  /** For cloze cards: a key shared by every OTHER cloze card produced from
+   *  the same source block (callout body, or blank-line block outside a
+   *  callout) -- set only when that block produced more than one card.
+   *  Revealing one sibling's back already reveals every cloze answer in
+   *  the shared block (see the "back reveals all" behaviour), so their due
+   *  dates get coordinated the same way a reverse Q&A pair's do — see
+   *  decks.ts siblingHashesOf() and scheduler.ts coordinateSiblingsDue().
+   *  Undefined for a lone cloze card, a same-seq group that collapsed into
+   *  a single card, and every non-cloze card. */
+  siblingGroup?: string;
   /** Nearest heading above this card's source block, for context at review
-   *  time. Falls back to the note's filename when no heading precedes it. */
+   *  time. Falls back to the note's filename when no heading precedes it.
+   *  For a cloze card from a titled callout, the callout's own title is
+   *  appended as "<heading> > <title>" (parser.ts parseNote()) -- the
+   *  title would otherwise be lost, since it's only used for the deck-tag
+   *  scan in calloutCards() and never becomes part of a cloze card's front.
+   *  callout-qa cards don't get this treatment: their title already IS the
+   *  visible front, so appending it again here would be redundant. */
   context: string;
 }
 
@@ -82,7 +98,7 @@ export type StateMap = Record<string, CardState>;
 export interface PersistedData {
   schema: 1;
   states: StateMap;
-  settings: SiftSettings;
+  settings: IngrainSettings;
   /** ISO timestamp of the last time a review reminder was shown (see
    *  reminder.ts). Optional for back-compat with data.json files saved
    *  before this field existed. */
@@ -101,7 +117,7 @@ export interface ClozeConfig {
   scope: ClozeScope;
 }
 
-export interface SiftSettings {
+export interface IngrainSettings {
   deckTagRoot: string; // tag prefix that marks a note as containing cards, e.g. "flashcards"
   reverseEmoji: string; // marks a card as reversible, e.g. "🔁"
   calloutType: string; // only callouts of this type (case-insensitive) become cards, e.g. "card"
@@ -111,7 +127,7 @@ export interface SiftSettings {
   reminderIntervalDays: number;
 }
 
-export const DEFAULT_SETTINGS: SiftSettings = {
+export const DEFAULT_SETTINGS: IngrainSettings = {
   deckTagRoot: "flashcards",
   reverseEmoji: "🔁",
   calloutType: "card",

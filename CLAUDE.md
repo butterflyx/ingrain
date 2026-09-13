@@ -1,4 +1,4 @@
-# Sift — Claude Code working notes
+# Ingrain — Claude Code working notes
 
 Reading-flow-first spaced repetition plugin for Obsidian. Cards come from
 callouts and inline clozes; card identity is a content hash; scheduling state

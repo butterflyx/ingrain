@@ -1,6 +1,6 @@
 {
-  "id": "sift",
-  "name": "Sift",
+  "id": "ingrain",
+  "name": "Ingrain",
   "version": "0.1.0",
   "minAppVersion": "1.5.0",
   "description": "Native callouts and highlights become flashcards — your files never know. Spaced repetition without plugin syntax.",

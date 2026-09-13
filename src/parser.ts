@@ -1,4 +1,4 @@
-import { Card, SiftSettings } from "./types";
+import { Card, IngrainSettings } from "./types";
 import { cardHash } from "./hash";
 
 // PURE parser: string in, Card[] out. No "obsidian" import — fully vitest-able.
@@ -25,7 +25,7 @@ function splitFrontmatter(md: string): { body: string; fm: string } {
 /** Collect every tag under the configured root, from frontmatter `tags:` and
  *  inline `#tags` alike. Shared by extractDeck() and hasDeckTag() so the two
  *  never drift out of sync on what counts as "tagged". */
-function findDeckTags(md: string, settings: SiftSettings): Set<string> {
+function findDeckTags(md: string, settings: IngrainSettings): Set<string> {
   const root = settings.deckTagRoot;
   const tags = new Set<string>();
 
@@ -52,7 +52,7 @@ function findDeckTags(md: string, settings: SiftSettings): Set<string> {
  * Looks in both frontmatter `tags:` and inline `#tags`. Subtag hierarchy
  * (tag/subtag) is preserved verbatim so the review layer can build the tree.
  */
-export function extractDeck(md: string, settings: SiftSettings): string {
+export function extractDeck(md: string, settings: IngrainSettings): string {
   return extractDecks(md, settings)[0];
 }
 
@@ -63,7 +63,7 @@ export function extractDeck(md: string, settings: SiftSettings): string {
  * root-only entry when no tag matches. extractDeck() is always the first
  * element of this array.
  */
-export function extractDecks(md: string, settings: SiftSettings): string[] {
+export function extractDecks(md: string, settings: IngrainSettings): string[] {
   const tags = findDeckTags(md, settings);
   return tags.size ? [...tags] : [settings.deckTagRoot];
 }
@@ -72,11 +72,11 @@ export function extractDecks(md: string, settings: SiftSettings): string[] {
  * True iff the note carries the configured deck-tag-root anywhere
  * (frontmatter tag list or inline #tag). Gates parseNote(): a note without
  * this tag produces zero cards, regardless of callouts/clozes present — this
- * is the actual opt-in that scopes Sift to notes the user marked for
+ * is the actual opt-in that scopes Ingrain to notes the user marked for
  * spaced repetition, rather than any note that happens to contain a
  * highlight or a callout.
  */
-export function hasDeckTag(md: string, settings: SiftSettings): boolean {
+export function hasDeckTag(md: string, settings: IngrainSettings): boolean {
   return findDeckTags(md, settings).size > 0;
 }
 
@@ -118,7 +118,7 @@ function tableHeaderRanges(text: string): [number, number][] {
  * table styling, not quiz content (dev-vault repro: a "**Layer**" header
  * cell was silently becoming its own cloze card).
  */
-export function extractClozes(text: string, settings: SiftSettings, allowSeq: boolean): ClozeMatch[] {
+export function extractClozes(text: string, settings: IngrainSettings, allowSeq: boolean): ClozeMatch[] {
   const patterns: RegExp[] = [];
   if (settings.cloze.highlight) {
     patterns.push(
@@ -196,13 +196,17 @@ function clozeCards(
   block: string,
   decks: string[],
   notePath: string,
-  settings: SiftSettings,
+  settings: IngrainSettings,
   allowSeq: boolean,
 ): Omit<Card, "context">[] {
   const clozes = extractClozes(block, settings, allowSeq);
   if (!clozes.length) return [];
   const back = renderCloze(block, clozes, null);
-  return groupClozes(clozes).map((group, gi) => ({
+  const groups = groupClozes(clozes);
+  // Shared only when this block produces more than one card -- a same-seq
+  // group that collapsed into one card has nothing to be a sibling of.
+  const siblingGroup = groups.length > 1 ? cardHash(block, "cloze-siblings") : undefined;
+  return groups.map((group, gi) => ({
     hash: cardHash(block, `cloze:${gi}`),
     notePath,
     deck: decks[0],
@@ -215,6 +219,7 @@ function clozeCards(
     hint: clozes[group[0]].hint,
     seq: clozes[group[0]].seq,
     sourceBlock: block,
+    siblingGroup,
   }));
 }
 
@@ -227,7 +232,7 @@ interface Callout {
 /** Extract `> [!type] Title` + `> body` callout blocks whose type matches
  *  settings.calloutType (case-insensitive). Non-matching callout types
  *  (e.g. [!note], [!warning]) are fully skipped — they never become cards. */
-export function findCallouts(body: string, settings: SiftSettings): Callout[] {
+export function findCallouts(body: string, settings: IngrainSettings): Callout[] {
   const wantedType = settings.calloutType.toLowerCase();
   const lines = body.split("\n");
   const callouts: Callout[] = [];
@@ -259,7 +264,7 @@ function calloutCards(
   c: Callout,
   decks: string[],
   notePath: string,
-  settings: SiftSettings,
+  settings: IngrainSettings,
 ): Omit<Card, "context">[] {
   // A callout can carry its own deck tag(s), overriding the note-level
   // decks just for cards produced from it — same "first tag(s) win"
@@ -337,7 +342,7 @@ function nearestHeading(headings: Heading[], offset: number): string | null {
 }
 
 /** Top-level entry point. */
-export function parseNote(md: string, notePath: string, settings: SiftSettings): Card[] {
+export function parseNote(md: string, notePath: string, settings: IngrainSettings): Card[] {
   if (!hasDeckTag(md, settings)) return [];
   const decks = extractDecks(md, settings);
   const { body } = splitFrontmatter(md);
@@ -353,8 +358,15 @@ export function parseNote(md: string, notePath: string, settings: SiftSettings):
 
   const callouts = findCallouts(body, settings);
   for (const c of callouts) {
-    const context = contextFor(c.raw);
-    for (const card of calloutCards(c, decks, notePath, settings)) cards.push({ ...card, context });
+    const heading = contextFor(c.raw);
+    // Cloze cards discard the callout title once produced (calloutCards()
+    // only uses it for the deck-tag scan), unlike callout-qa cards where
+    // the title IS the visible front -- so append it here as a breadcrumb,
+    // but only for cloze cards, to avoid showing it twice on qa cards.
+    const clozeContext = c.title ? `${heading} > ${c.title}` : heading;
+    for (const card of calloutCards(c, decks, notePath, settings)) {
+      cards.push({ ...card, context: card.kind === "cloze" ? clozeContext : heading });
+    }
   }
 
   // Clozes outside callouts: split remaining text into blank-line blocks,

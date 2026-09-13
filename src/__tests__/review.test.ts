@@ -126,25 +126,51 @@ describe("rate", () => {
     expect(JSON.stringify(currentCard(s))).toBe(before);
   });
 
-  it("removes the reverse sibling from the remaining queue when reverseOfHash is given", () => {
+  it("removes the reverse sibling from the remaining queue when siblingHashes is given", () => {
     const s = reveal(startSession([state("front"), state("back")]));
-    const { session } = rate(s, 3, now, "back");
+    const { session } = rate(s, 3, now, ["back"]);
     expect(isComplete(session)).toBe(true);
     expect(sessionProgress(session)).toEqual({ reviewed: 1, remaining: 0, total: 1 });
   });
 
   it("removes the sibling even if it's further ahead in the queue, leaving the rest in order", () => {
     const s = reveal(startSession([state("front"), state("middle"), state("back")]));
-    const { session } = rate(s, 3, now, "back");
+    const { session } = rate(s, 3, now, ["back"]);
     expect(currentCard(session)?.hash).toBe("middle");
     expect(sessionProgress(session)).toEqual({ reviewed: 1, remaining: 1, total: 2 });
   });
 
-  it("leaves the queue untouched when no reverseOfHash is given", () => {
+  it("leaves the queue untouched when no siblingHashes are given", () => {
     const s = reveal(startSession([state("a"), state("b")]));
     const { session } = rate(s, 3, now);
     expect(currentCard(session)?.hash).toBe("b");
     expect(sessionProgress(session)).toEqual({ reviewed: 1, remaining: 1, total: 2 });
+  });
+
+  it("leaves the queue untouched when siblingHashes is an empty array", () => {
+    const s = reveal(startSession([state("a"), state("b")]));
+    const { session } = rate(s, 3, now, []);
+    expect(currentCard(session)?.hash).toBe("b");
+    expect(sessionProgress(session)).toEqual({ reviewed: 1, remaining: 1, total: 2 });
+  });
+
+  it("removes ALL listed sibling hashes from a larger queue, leaving the rest in order", () => {
+    const s = reveal(
+      startSession([state("a"), state("b"), state("c"), state("d"), state("e")]),
+    );
+    const { session } = rate(s, 3, now, ["b", "d"]);
+    expect(sessionProgress(session)).toEqual({ reviewed: 1, remaining: 2, total: 3 });
+    expect(currentCard(session)?.hash).toBe("c");
+    const { session: session2 } = rate(reveal(session), 3, now);
+    expect(currentCard(session2)?.hash).toBe("e");
+  });
+
+  it("leaves an already-passed sibling hash alone instead of double-removing it", () => {
+    const s0 = reveal(startSession([state("a"), state("b")]));
+    const { session: afterA } = rate(s0, 3, now); // "a" is now behind session.index
+    const { session } = rate(reveal(afterA), 3, now, ["a"]);
+    expect(isComplete(session)).toBe(true);
+    expect(sessionProgress(session)).toEqual({ reviewed: 2, remaining: 0, total: 2 });
   });
 });
 
