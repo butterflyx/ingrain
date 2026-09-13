@@ -31,6 +31,7 @@ import {
   renameNotePath,
   sweepOrphans,
   dueCards,
+  mergeStates,
 } from "./reconcile";
 import {
   computeFingerprint,
@@ -372,6 +373,48 @@ export default class IngrainPlugin extends Plugin {
       fileCache: this.fileCache,
     };
     await this.saveData(data);
+  }
+
+  /** Fired by Obsidian when data.json changes on disk from something other
+   *  than this plugin's own saveData() -- in practice, a sync service (e.g.
+   *  Obsidian Sync) pulling down another device's review progress. Without
+   *  this, states loaded once at onload() would never reflect a sync that
+   *  happens while the app stays open, leaving the due count silently stale
+   *  until a full restart.
+   *
+   *  states is merged (not overwritten) via mergeStates() so a device that
+   *  wrote its own progress in the narrow window before this fires can't
+   *  have it silently erased by the incoming file. settings is last-writer-
+   *  wins, matching the existing single-editor settings-tab model. fileCache
+   *  is deliberately left untouched -- it's keyed by THIS device's own
+   *  filesystem mtimes, which aren't comparable across devices.
+   *
+   *  It isn't confirmed from the Obsidian API docs whether this plugin's own
+   *  saveData() call below is guaranteed never to re-trigger this same hook.
+   *  The equality short-circuit makes that safe either way: a self-triggered
+   *  re-fire reads back exactly what was just written, matches, and returns
+   *  immediately instead of looping. */
+  async onExternalSettingsChange(): Promise<void> {
+    const data = (await this.loadData()) as Partial<PersistedData> | null;
+    if (data?.schema !== 1) return;
+
+    if (
+      JSON.stringify(data.states ?? {}) === JSON.stringify(this.states) &&
+      JSON.stringify(data.settings) === JSON.stringify(this.settings)
+    ) {
+      return;
+    }
+
+    const oldFingerprint = computeFingerprint(this.settings);
+    this.states = mergeStates(this.states, data.states ?? {});
+    this.settings = data.settings ?? this.settings;
+
+    if (computeFingerprint(this.settings) !== oldFingerprint) {
+      await this.rebuildIndex(); // already saves + notifyDecksChanged()
+    } else {
+      await this.save();
+      this.notifyDecksChanged();
+    }
   }
 
   /** Persist settings-tab edits AND reindex the vault with them, so a

@@ -85,3 +85,44 @@ export function dueCards(store: StateMap, now = new Date()): CardState[] {
     .filter((s) => new Date(s.due).getTime() <= now.getTime())
     .sort((a, b) => new Date(a.due).getTime() - new Date(b.due).getTime());
 }
+
+/** Pick whichever of two CardStates for the same hash represents more
+ *  progress: more reviewLog entries wins (a review always appends exactly
+ *  one, so it's a clean monotonic signal); tied -> later lastReviewed wins
+ *  (null treated as -Infinity); still tied -> later due wins; still tied
+ *  (unreachable in practice -- due/lastReviewed are derived from the same
+ *  schedule() call that appended the reviewLog entry) -> incoming, arbitrary
+ *  but deterministic. */
+function moreAdvanced(local: CardState, incoming: CardState): CardState {
+  if (local.reviewLog.length !== incoming.reviewLog.length) {
+    return local.reviewLog.length > incoming.reviewLog.length ? local : incoming;
+  }
+  const localReviewed = local.lastReviewed ? new Date(local.lastReviewed).getTime() : -Infinity;
+  const incomingReviewed = incoming.lastReviewed
+    ? new Date(incoming.lastReviewed).getTime()
+    : -Infinity;
+  if (localReviewed !== incomingReviewed) {
+    return localReviewed > incomingReviewed ? local : incoming;
+  }
+  const localDue = new Date(local.due).getTime();
+  const incomingDue = new Date(incoming.due).getTime();
+  if (localDue !== incomingDue) return localDue > incomingDue ? local : incoming;
+  return incoming;
+}
+
+/**
+ * Reconcile two independently-evolved copies of the store -- e.g. this
+ * device's in-memory state vs. a data.json just synced in from another
+ * device (see main.ts onExternalSettingsChange()). A hash present on only
+ * one side passes through unchanged; a hash present on both keeps whichever
+ * CardState is more advanced (see moreAdvanced()), so a synced-in file can
+ * never silently erase progress made locally since the last save.
+ */
+export function mergeStates(local: StateMap, incoming: StateMap): StateMap {
+  const next: StateMap = { ...local };
+  for (const [hash, incomingState] of Object.entries(incoming)) {
+    const localState = next[hash];
+    next[hash] = localState ? moreAdvanced(localState, incomingState) : incomingState;
+  }
+  return next;
+}

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { reconcileNote, sweepOrphans, renameNotePath } from "../reconcile";
+import { reconcileNote, sweepOrphans, renameNotePath, mergeStates } from "../reconcile";
 import { Card, StateMap } from "../types";
+import { initialState, schedule } from "../scheduler";
 
 function card(hash: string, notePath: string): Card {
   return {
@@ -72,5 +73,63 @@ describe("sweepOrphans", () => {
     expect(swept.purged).toEqual(["b"]);
     expect(swept.states["b"]).toBeUndefined();
     expect(swept.states["a"]).toBeDefined();
+  });
+});
+
+describe("mergeStates", () => {
+  it("keeps a hash present only in local", () => {
+    const local: StateMap = { a: initialState("a", "n.md", now) };
+    expect(mergeStates(local, {})["a"]).toEqual(local["a"]);
+  });
+
+  it("keeps a hash present only in incoming", () => {
+    const incoming: StateMap = { b: initialState("b", "n.md", now) };
+    expect(mergeStates({}, incoming)["b"]).toEqual(incoming["b"]);
+  });
+
+  it("picks whichever side has more reviewLog entries, regardless of argument order", () => {
+    const base = initialState("a", "n.md", now);
+    const twice = schedule(schedule(base, 3, now), 3, now);
+    const once = schedule(base, 3, now);
+
+    const local: StateMap = { a: twice };
+    const incoming: StateMap = { a: once };
+    expect(mergeStates(local, incoming)["a"]).toEqual(twice);
+    expect(mergeStates(incoming, local)["a"]).toEqual(twice);
+  });
+
+  it("tie-breaks equal reviewLog length by the later lastReviewed", () => {
+    const a = schedule(initialState("a", "n.md", now), 3, now);
+    const b = { ...a, lastReviewed: new Date("2026-07-14T00:00:00Z").toISOString() };
+
+    expect(mergeStates({ a }, { a: b })["a"]).toEqual(b);
+  });
+
+  it("tie-breaks two never-reviewed states by the later due date", () => {
+    const a = initialState("a", "n.md", now);
+    const b = { ...a, due: new Date("2026-07-14T00:00:00Z").toISOString() };
+
+    expect(mergeStates({ a }, { a: b })["a"]).toEqual(b);
+  });
+
+  it("never mutates either input", () => {
+    const local: StateMap = { a: initialState("a", "n.md", now) };
+    const incoming: StateMap = { a: schedule(initialState("a", "n.md", now), 3, now) };
+    const localBefore = JSON.stringify(local);
+    const incomingBefore = JSON.stringify(incoming);
+
+    mergeStates(local, incoming);
+
+    expect(JSON.stringify(local)).toBe(localBefore);
+    expect(JSON.stringify(incoming)).toBe(incomingBefore);
+  });
+
+  it("returns a new object, not either input by reference", () => {
+    const local: StateMap = { a: initialState("a", "n.md", now) };
+    const incoming: StateMap = {};
+    const result = mergeStates(local, incoming);
+
+    expect(result).not.toBe(local);
+    expect(result).not.toBe(incoming);
   });
 });
