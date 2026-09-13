@@ -19,6 +19,7 @@ import {
   CardState,
   ClozeScope,
   DEFAULT_SETTINGS,
+  FileCache,
   IngrainSettings,
   PersistedData,
   Rating,
@@ -31,6 +32,14 @@ import {
   sweepOrphans,
   dueCards,
 } from "./reconcile";
+import {
+  computeFingerprint,
+  withFingerprint,
+  getCachedCards,
+  withEntry,
+  withoutPath,
+  pruneToPaths,
+} from "./indexCache";
 import {
   ReviewSessionState,
   canRate,
@@ -53,6 +62,10 @@ import { Key, t } from "./i18n";
 // DOM to it.
 
 const VIEW_TYPE_DECKS = "ingrain-decks-view";
+/** How long rebuildIndex() waits before showing an "indexing…" Notice.
+ *  Comfortably above I/O jitter on an all-cache-hit (warm) load, so normal
+ *  reloads never flash it; comfortably below a genuine cold sweep. */
+const INDEXING_NOTICE_DELAY_MS = 400;
 
 export default class IngrainPlugin extends Plugin {
   settings: IngrainSettings = DEFAULT_SETTINGS;
@@ -68,6 +81,10 @@ export default class IngrainPlugin extends Plugin {
    *  so the review Modal can render front/back for due hashes, since
    *  CardState alone has no renderable content. */
   cardCache: Record<string, Card> = {};
+  /** Persisted counterpart of cardCache: last-parsed Card[] per file path,
+   *  gated by mtime + a settings fingerprint, so rebuildIndex() can skip
+   *  re-reading/re-parsing files that haven't changed. See indexCache.ts. */
+  fileCache: FileCache | undefined = undefined;
   /** ISO timestamp of the last time a review reminder was shown, or null.
    *  See reminder.ts shouldShowReminder(). */
   private lastReminderShown: string | null = null;
@@ -147,6 +164,10 @@ export default class IngrainPlugin extends Plugin {
         this.app.vault.on("rename", (file, oldPath) => {
           if (file instanceof TFile) {
             this.states = renameNotePath(this.states, oldPath, file.path);
+            // The old path's cache entry can't be safely reused under the
+            // new path (Card.context's filename fallback and Card.notePath
+            // are path-derived) -- drop it, next index reparses fresh.
+            if (this.fileCache) this.fileCache = withoutPath(this.fileCache, oldPath);
             void this.save();
           }
         }),
@@ -216,26 +237,71 @@ export default class IngrainPlugin extends Plugin {
     this.states = result.states;
     for (const c of cards) this.cardCache[c.hash] = c;
     for (const h of result.orphaned) delete this.cardCache[h];
+
+    // This path is always a fresh parse (triggered by an actual modify/
+    // create event) -- unconditionally record it so rebuildIndex() can
+    // skip this file next time, as long as it stays unchanged.
+    const fingerprint = computeFingerprint(this.settings);
+    this.fileCache = withEntry(
+      withFingerprint(this.fileCache, fingerprint),
+      file.path,
+      file.stat.mtime,
+      cards,
+    );
+
     await this.save();
     this.notifyDecksChanged();
   }
 
   private async rebuildIndex() {
+    // reconcileNote() runs for EVERY file below regardless of cache hit/miss
+    // -- that's what keeps sweepOrphans()/resetAllProgress() correct even on
+    // a 100%-cache-hit sweep. Only the cachedRead()+parseNote() step (the
+    // actual cost) gets skipped for files whose mtime+settings are unchanged.
+    const fingerprint = computeFingerprint(this.settings);
+    let cache = withFingerprint(this.fileCache, fingerprint);
     const live = new Set<string>();
-    for (const file of this.app.vault.getMarkdownFiles()) {
-      const md = await this.app.vault.cachedRead(file);
-      const cards = parseNote(md, file.path, this.settings);
-      const result = reconcileNote(cards, this.states, file.path);
-      this.states = result.states;
-      for (const c of cards) {
-        live.add(c.hash);
-        this.cardCache[c.hash] = c;
+    const livePaths = new Set<string>();
+
+    // Delayed so a fast, all-cache-hit sweep never flashes this -- only a
+    // genuinely slow (cold) sweep surfaces it.
+    let indexingNotice: Notice | undefined;
+    const noticeTimer = window.setTimeout(() => {
+      indexingNotice = new Notice(t(this.locale, "noticeIndexing"), 0);
+    }, INDEXING_NOTICE_DELAY_MS);
+
+    try {
+      for (const file of this.app.vault.getMarkdownFiles()) {
+        livePaths.add(file.path);
+        const cached = getCachedCards(cache, file.path, file.stat.mtime, fingerprint);
+        let cards: Card[];
+        if (cached) {
+          cards = cached;
+        } else {
+          const md = await this.app.vault.cachedRead(file);
+          cards = parseNote(md, file.path, this.settings);
+          cache = withEntry(cache, file.path, file.stat.mtime, cards);
+        }
+        const result = reconcileNote(cards, this.states, file.path);
+        this.states = result.states;
+        for (const c of cards) {
+          live.add(c.hash);
+          this.cardCache[c.hash] = c;
+        }
+        for (const h of result.orphaned) delete this.cardCache[h];
       }
-      for (const h of result.orphaned) delete this.cardCache[h];
+    } finally {
+      // Guarantees the timer is cleared and any shown notice hidden even if
+      // something throws mid-sweep -- otherwise a duration-0 Notice could
+      // get stuck on screen permanently.
+      window.clearTimeout(noticeTimer);
+      indexingNotice?.hide();
     }
+
     const swept = sweepOrphans(this.states, live);
     this.states = swept.states;
     for (const h of swept.purged) delete this.cardCache[h];
+    this.fileCache = pruneToPaths(cache, livePaths);
     await this.save();
     this.notifyDecksChanged();
   }
@@ -293,6 +359,7 @@ export default class IngrainPlugin extends Plugin {
       this.states = data.states ?? {};
       this.settings = data.settings ?? DEFAULT_SETTINGS;
       this.lastReminderShown = data.lastReminderShown ?? null;
+      this.fileCache = data.fileCache;
     }
   }
 
@@ -302,6 +369,7 @@ export default class IngrainPlugin extends Plugin {
       states: this.states,
       settings: this.settings,
       lastReminderShown: this.lastReminderShown,
+      fileCache: this.fileCache,
     };
     await this.saveData(data);
   }

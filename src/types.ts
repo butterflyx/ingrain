@@ -95,6 +95,22 @@ export interface CardState {
 /** hash -> state. This is the whole persisted store (plus a schema version). */
 export type StateMap = Record<string, CardState>;
 
+/** A file's parsed cards as of the last time it was actually re-read, plus
+ *  the mtime it was read at. Lets rebuildIndex() skip re-parsing a file
+ *  whose mtime hasn't changed (see indexCache.ts). */
+export interface FileCacheEntry {
+  mtime: number;
+  cards: Card[];
+}
+
+/** Per-file parse cache, gated by a fingerprint of the settings that affect
+ *  parsing (indexCache.ts computeFingerprint()) -- any parsing-relevant
+ *  settings change invalidates every entry at once, cheaply. */
+export interface FileCache {
+  fingerprint: string;
+  files: Record<string, FileCacheEntry>;
+}
+
 export interface PersistedData {
   schema: 1;
   states: StateMap;
@@ -103,6 +119,10 @@ export interface PersistedData {
    *  reminder.ts). Optional for back-compat with data.json files saved
    *  before this field existed. */
   lastReminderShown?: string | null;
+  /** Optional for back-compat with data.json files saved before this field
+   *  existed -- absence is treated as a cold cache, self-healing via a full
+   *  reparse on the next rebuildIndex(). */
+  fileCache?: FileCache;
 }
 
 /** Where cloze markers are recognized: everywhere in the note body, or only

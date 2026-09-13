@@ -16,6 +16,7 @@ export const strings = {
     noticeReminderDue: "Ingrain: {count} card(s) due. Click to review.",
     noticeNoCardsDue: "Ingrain: no cards due.",
     noticeNoCardsDueInDeck: "Ingrain: no cards due in {deck}.",
+    noticeIndexing: "Ingrain: indexing your vault…",
     noticeStillIndexing: "Ingrain: still indexing, try again in a moment.",
     noticeProgressReset: "Ingrain: all learning progress has been reset.",
     // ReviewModal
@@ -72,6 +73,7 @@ export const strings = {
     noticeReminderDue: "Ingrain: {count} Karte(n) fällig. Klicken zum Lernen.",
     noticeNoCardsDue: "Ingrain: Keine Karten fällig.",
     noticeNoCardsDueInDeck: "Ingrain: Keine Karten fällig in {deck}.",
+    noticeIndexing: "Ingrain: Vault wird indexiert…",
     noticeStillIndexing: "Ingrain: Wird noch indexiert, bitte gleich erneut versuchen.",
     noticeProgressReset: "Ingrain: Der gesamte Lernfortschritt wurde zurückgesetzt.",
     reviewProgressTitle: "{deck} — {current} von {total}",
