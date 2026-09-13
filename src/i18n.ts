@@ -18,6 +18,7 @@ export const strings = {
     noticeNoCardsDueInDeck: "Ingrain: no cards due in {deck}.",
     noticeIndexing: "Ingrain: indexing your vault…",
     noticeStillIndexing: "Ingrain: still indexing, try again in a moment.",
+    noticeSyncedFromDevice: "Ingrain: progress synced from another device.",
     noticeProgressReset: "Ingrain: all learning progress has been reset.",
     // ReviewModal
     reviewProgressTitle: "{deck} — {current} of {total}",
@@ -75,6 +76,7 @@ export const strings = {
     noticeNoCardsDueInDeck: "Ingrain: Keine Karten fällig in {deck}.",
     noticeIndexing: "Ingrain: Vault wird indexiert…",
     noticeStillIndexing: "Ingrain: Wird noch indexiert, bitte gleich erneut versuchen.",
+    noticeSyncedFromDevice: "Ingrain: Fortschritt von einem anderen Gerät synchronisiert.",
     noticeProgressReset: "Ingrain: Der gesamte Lernfortschritt wurde zurückgesetzt.",
     reviewProgressTitle: "{deck} — {current} von {total}",
     reviewOpenSourceNote: "Quellnotiz öffnen",

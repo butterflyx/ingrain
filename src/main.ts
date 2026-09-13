@@ -405,6 +405,8 @@ export default class IngrainPlugin extends Plugin {
       return;
     }
 
+    new Notice(t(this.locale, "noticeSyncedFromDevice"));
+
     const oldFingerprint = computeFingerprint(this.settings);
     this.states = mergeStates(this.states, data.states ?? {});
     this.settings = data.settings ?? this.settings;
