@@ -274,9 +274,10 @@ falls back to English.
 ## Contributing / development
 
 See `CLAUDE.md` for the internal architecture, module boundaries, and test
-workflow. Bug reports, edge cases, and general feedback are genuinely
-welcome — especially this early, before wider use has had a chance to
-find what a single-vault development process couldn't.
+workflow, and `CHANGELOG.md` for what's changed release to release. Bug
+reports, edge cases, and general feedback are genuinely welcome —
+especially this early, before wider use has had a chance to find what a
+single-vault development process couldn't.
 
 Built with the assistance of [Claude Code](https://claude.com/claude-code).
 The test suite and architecture boundaries described in `CLAUDE.md` are
