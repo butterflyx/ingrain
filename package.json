@@ -1,6 +1,6 @@
 {
   "name": "ingrain",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Native callouts and highlights become flashcards — your files never know. Spaced repetition without plugin syntax.",
   "main": "main.js",
   "scripts": {
