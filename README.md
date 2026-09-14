@@ -4,6 +4,32 @@ Spaced repetition for [Obsidian](https://obsidian.md) that turns the notes
 you already write into flashcards — cards come from callouts and
 highlighted text, not from dedicated flashcard blocks.
 
+![The review modal, showing a card front, revealed answer, and rating buttons](images/review-modal.png)
+
+## Status
+
+This is my first public Obsidian plugin, currently at `0.1.0`. It's not
+yet in the Community Plugins directory — you'd be building it from source
+(see below) and running it before any outside review has happened.
+
+What that means in practice:
+
+- I've used it daily on my own vault (~650 cards) for several weeks and
+  it holds up, but it hasn't been exercised across the range of vault
+  sizes, note structures, and platforms a wider audience would bring.
+- **Back up your vault before trying it**, especially the first time.
+  Ingrain never writes into your notes — it only reads them (no
+  `vault.modify()`/`vault.process()` anywhere in the source) — so the
+  realistic worst case is losing or corrupting the plugin's own
+  scheduling data (`data.json`), not your notes themselves. Still,
+  "should be fine" isn't the same as "verified fine" this early on.
+- Test suite covers every scheduling/parsing rule directly (see
+  `CLAUDE.md`), but that's confidence in the logic, not a substitute for
+  it surviving contact with someone else's real vault.
+- I'd genuinely like to hear about anything that breaks, surprises you,
+  or just feels off — see [Contributing](#contributing--development)
+  below.
+
 ## Why
 
 Most spaced-repetition plugins ask you to write in a special syntax, wrap
@@ -40,6 +66,8 @@ ln -sfn "$(pwd)" "/path/to/YourVault/.obsidian/plugins/ingrain"
 ```
 
 Open Obsidian, go to **Settings → Community plugins**, and enable Ingrain.
+Consider trying it on a test vault, or a copy of your vault, before
+pointing it at the one you actually rely on.
 
 ## Creating cards
 
@@ -164,6 +192,8 @@ won't immediately be asked the same fact twice from opposite directions.
 
 ### The deck overview
 
+![The deck overview, listing decks and subdecks with colored due-count badges](images/deck-overview.png)
+
 Click the graduation-cap icon in the ribbon (or run **Open deck
 overview**) to open a page listing every deck and subdeck. Each row shows
 its due cards broken down by how you last rated them — colored **Again /
@@ -207,7 +237,8 @@ palette to force a full rescan.
 
 A **Danger zone** at the bottom has a "Reset everything" button that
 permanently deletes all scheduling history and starts every card fresh —
-behind a confirmation dialog, since it can't be undone.
+behind a confirmation dialog, since it can't be undone. Worth a backup
+first if that history matters to you.
 
 ## Language
 
@@ -223,6 +254,10 @@ falls back to English.
   none is planned.
 - Reviewing an entire note at once is intentionally not supported — cards
   are always reviewed individually.
+- No network access, no external accounts, no telemetry of any kind —
+  nothing to disclose there, but also nothing to fall back on if local
+  data is lost. Standard Obsidian vault backup/sync practices are your
+  safety net, same as for any other plugin.
 
 ## Design notes
 
@@ -239,7 +274,13 @@ falls back to English.
 ## Contributing / development
 
 See `CLAUDE.md` for the internal architecture, module boundaries, and test
-workflow.
+workflow. Bug reports, edge cases, and general feedback are genuinely
+welcome — especially this early, before wider use has had a chance to
+find what a single-vault development process couldn't.
+
+Built with the assistance of [Claude Code](https://claude.com/claude-code).
+The test suite and architecture boundaries described in `CLAUDE.md` are
+what I've leaned on to keep that trustworthy — worth knowing either way.
 
 ## License
 
