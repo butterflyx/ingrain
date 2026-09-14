@@ -211,7 +211,7 @@ export default class IngrainPlugin extends Plugin {
     }
     const due = dueCards(this.states).length;
     const notice = new Notice(t(this.locale, "noticeReminderDue", { count: due }), 10000);
-    notice.noticeEl.addEventListener("click", () => void this.activateDecksView());
+    notice.messageEl.addEventListener("click", () => void this.activateDecksView());
     this.lastReminderShown = new Date().toISOString();
     void this.save();
   }
@@ -224,11 +224,15 @@ export default class IngrainPlugin extends Plugin {
       leaf = workspace.getLeaf("tab");
       await leaf.setViewState({ type: VIEW_TYPE_DECKS, active: true });
     }
-    workspace.revealLeaf(leaf);
+    // await (not void): also guarantees the view isn't left in a deferred
+    // (not-yet-loaded) state -- see Workspace.revealLeaf's own doc comment.
+    await workspace.revealLeaf(leaf);
   }
 
   onunload() {
-    this.app.workspace.detachLeavesOfType(VIEW_TYPE_DECKS);
+    // Deliberately does NOT detachLeavesOfType(VIEW_TYPE_DECKS) -- doing so
+    // resets the leaf to its default location next load even if the user
+    // has since moved it elsewhere. Obsidian manages leaf cleanup itself.
     void this.save();
   }
 
@@ -715,7 +719,7 @@ class DecksView extends ItemView {
 /** Second confirmation hurdle before wiping every card's scheduling
  *  history -- deliberately not a one-click action from the settings tab. */
 class ConfirmResetModal extends Modal {
-  constructor(app: App, private locale: string, private onConfirm: () => void) {
+  constructor(app: App, private locale: string, private onConfirm: () => void | Promise<void>) {
     super(app);
   }
 
@@ -728,14 +732,22 @@ class ConfirmResetModal extends Modal {
       .onClick(() => this.close());
     new ButtonComponent(row)
       .setButtonText(t(this.locale, "resetEverything"))
+      // setDestructive() (the non-deprecated replacement) needs Obsidian
+      // 1.13.0 -- not worth the minAppVersion jump from 1.8.7 just for a
+      // button style; setWarning() is deprecated but still functional.
       .setWarning()
       .onClick(() => {
         this.close();
-        this.onConfirm();
+        void this.onConfirm();
       });
   }
 }
 
+/** Doesn't implement getSettingDefinitions() (the newer declarative
+ *  settings-search API) -- it's 1.13.0+ only, the same tier as
+ *  setDestructive() above, and not worth another minAppVersion jump just
+ *  for OS-level settings-search integration. Revisit if minAppVersion
+ *  ever needs to move that high for an unrelated reason anyway. */
 class IngrainSettingTab extends PluginSettingTab {
   private dirty = false;
 
@@ -819,13 +831,15 @@ class IngrainSettingTab extends PluginSettingTab {
         }),
       );
 
-    containerEl.createEl("h3", { text: t(locale, "dangerZone") });
+    new Setting(containerEl).setName(t(locale, "dangerZone")).setHeading();
     new Setting(containerEl)
       .setName(t(locale, "resetName"))
       .setDesc(t(locale, "resetDesc"))
       .addButton((btn) =>
         btn
           .setButtonText(t(locale, "resetEverything"))
+          // See the ConfirmResetModal button above for why this stays
+          // setWarning() rather than the 1.13.0-only setDestructive().
           .setWarning()
           .onClick(() => {
             new ConfirmResetModal(this.app, locale, async () => {

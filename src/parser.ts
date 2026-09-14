@@ -139,8 +139,8 @@ export function extractClozes(text: string, settings: IngrainSettings, allowSeq:
   for (const re of patterns) {
     for (const m of text.matchAll(re)) {
       found.push({
-        start: m.index!,
-        end: m.index! + m[0].length,
+        start: m.index,
+        end: m.index + m[0].length,
         answer: m[1],
         hint: m[2],
         seq: m[3],
@@ -325,7 +325,7 @@ interface Heading {
 /** Collect every Markdown heading (any level) in the body, in document order. */
 function findHeadings(body: string): Heading[] {
   return [...body.matchAll(/^#{1,6}\s+(.+)$/gm)].map((m) => ({
-    offset: m.index!,
+    offset: m.index,
     text: m[1].trim(),
   }));
 }

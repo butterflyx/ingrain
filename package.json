@@ -8,7 +8,8 @@
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -noEmit -skipLibCheck"
+    "typecheck": "tsc -noEmit -skipLibCheck",
+    "lint": "eslint ."
   },
   "keywords": [
     "obsidian",
@@ -17,12 +18,16 @@
   ],
   "license": "MIT",
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@eslint/json": "^2.1.0",
     "@types/node": "^24.0.0",
-    "builtin-modules": "^3.3.0",
     "esbuild": "0.28.1",
+    "eslint": "^10.10.0",
+    "eslint-plugin-obsidianmd": "^0.4.2",
     "obsidian": "latest",
     "tslib": "2.6.2",
     "typescript": "5.4.5",
+    "typescript-eslint": "^8.70.0",
     "vitest": "^5.0.0"
   },
   "allowScripts": {
