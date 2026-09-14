@@ -9,7 +9,7 @@ import {
   Notice,
   Plugin,
   PluginSettingTab,
-  Setting,
+  SettingDefinitionItem,
   TFile,
   WorkspaceLeaf,
   moment,
@@ -732,10 +732,7 @@ class ConfirmResetModal extends Modal {
       .onClick(() => this.close());
     new ButtonComponent(row)
       .setButtonText(t(this.locale, "resetEverything"))
-      // setDestructive() (the non-deprecated replacement) needs Obsidian
-      // 1.13.0 -- not worth the minAppVersion jump from 1.8.7 just for a
-      // button style; setWarning() is deprecated but still functional.
-      .setWarning()
+      .setDestructive()
       .onClick(() => {
         this.close();
         void this.onConfirm();
@@ -743,11 +740,6 @@ class ConfirmResetModal extends Modal {
   }
 }
 
-/** Doesn't implement getSettingDefinitions() (the newer declarative
- *  settings-search API) -- it's 1.13.0+ only, the same tier as
- *  setDestructive() above, and not worth another minAppVersion jump just
- *  for OS-level settings-search integration. Revisit if minAppVersion
- *  ever needs to move that high for an unrelated reason anyway. */
 class IngrainSettingTab extends PluginSettingTab {
   private dirty = false;
 
@@ -755,105 +747,140 @@ class IngrainSettingTab extends PluginSettingTab {
     super(app, plugin);
   }
 
-  display(): void {
-    const { containerEl } = this;
-    containerEl.empty();
-    this.dirty = false;
-
+  /** Declarative settings API (Obsidian 1.13.0+) -- replaces display().
+   *  Re-evaluated on every render, so locale switches take effect without
+   *  extra plumbing. Values are read/written via getControlValue()/
+   *  setControlValue() below, keyed by the flat strings used here. */
+  getSettingDefinitions(): SettingDefinitionItem[] {
     const locale = this.plugin.locale;
 
-    new Setting(containerEl)
-      .setName(t(locale, "deckTagRootName"))
-      .setDesc(t(locale, "deckTagRootDesc"))
-      .addText((txt) =>
-        txt.setValue(this.plugin.settings.deckTagRoot).onChange((v) => {
-          this.plugin.settings.deckTagRoot = v.trim();
-          this.dirty = true;
-        }),
-      );
+    return [
+      {
+        name: t(locale, "deckTagRootName"),
+        desc: t(locale, "deckTagRootDesc"),
+        control: { type: "text", key: "deckTagRoot" },
+      },
+      {
+        name: t(locale, "reverseEmojiName"),
+        desc: t(locale, "reverseEmojiDesc"),
+        control: { type: "text", key: "reverseEmoji" },
+      },
+      {
+        name: t(locale, "calloutTypeName"),
+        desc: t(locale, "calloutTypeDesc"),
+        control: { type: "text", key: "calloutType" },
+      },
+      {
+        name: t(locale, "clozeHighlightName"),
+        control: { type: "toggle", key: "clozeHighlight" },
+      },
+      {
+        name: t(locale, "clozeBoldName"),
+        control: { type: "toggle", key: "clozeBold" },
+      },
+      {
+        name: t(locale, "clozeScopeName"),
+        desc: t(locale, "clozeScopeDesc"),
+        control: {
+          type: "dropdown",
+          key: "clozeScope",
+          options: {
+            anywhere: t(locale, "clozeScopeAnywhere"),
+            "callout-only": t(locale, "clozeScopeCalloutOnly"),
+          },
+        },
+      },
+      {
+        name: t(locale, "reminderName"),
+        desc: t(locale, "reminderDesc"),
+        control: { type: "number", key: "reminderIntervalDays", min: 0, step: 1 },
+      },
+      {
+        type: "group",
+        heading: t(locale, "dangerZone"),
+        items: [
+          {
+            name: t(locale, "resetName"),
+            desc: t(locale, "resetDesc"),
+            // Imperative render (not `action`) so the button keeps its
+            // destructive styling exactly as before, via the normal
+            // Setting/ButtonComponent API.
+            render: (setting) => {
+              setting.addButton((btn) =>
+                btn
+                  .setButtonText(t(locale, "resetEverything"))
+                  .setDestructive()
+                  .onClick(() => {
+                    new ConfirmResetModal(this.app, locale, async () => {
+                      await this.plugin.resetAllProgress();
+                      new Notice(t(locale, "noticeProgressReset"));
+                    }).open();
+                  }),
+              );
+            },
+          },
+        ],
+      },
+    ];
+  }
 
-    new Setting(containerEl)
-      .setName(t(locale, "reverseEmojiName"))
-      .setDesc(t(locale, "reverseEmojiDesc"))
-      .addText((txt) =>
-        txt.setValue(this.plugin.settings.reverseEmoji).onChange((v) => {
-          this.plugin.settings.reverseEmoji = v.trim();
-          this.dirty = true;
-        }),
-      );
+  getControlValue(key: string): unknown {
+    switch (key) {
+      case "deckTagRoot":
+        return this.plugin.settings.deckTagRoot;
+      case "reverseEmoji":
+        return this.plugin.settings.reverseEmoji;
+      case "calloutType":
+        return this.plugin.settings.calloutType;
+      case "clozeHighlight":
+        return this.plugin.settings.cloze.highlight;
+      case "clozeBold":
+        return this.plugin.settings.cloze.bold;
+      case "clozeScope":
+        return this.plugin.settings.cloze.scope;
+      case "reminderIntervalDays":
+        return this.plugin.settings.reminderIntervalDays;
+      default:
+        return undefined;
+    }
+  }
 
-    new Setting(containerEl)
-      .setName(t(locale, "calloutTypeName"))
-      .setDesc(t(locale, "calloutTypeDesc"))
-      .addText((txt) =>
-        txt.setValue(this.plugin.settings.calloutType).onChange((v) => {
-          this.plugin.settings.calloutType = v.trim();
-          this.dirty = true;
-        }),
-      );
-
-    new Setting(containerEl).setName(t(locale, "clozeHighlightName")).addToggle((tg) =>
-      tg.setValue(this.plugin.settings.cloze.highlight).onChange((v) => {
-        this.plugin.settings.cloze.highlight = v;
-        this.dirty = true;
-      }),
-    );
-
-    new Setting(containerEl).setName(t(locale, "clozeBoldName")).addToggle((tg) =>
-      tg.setValue(this.plugin.settings.cloze.bold).onChange((v) => {
-        this.plugin.settings.cloze.bold = v;
-        this.dirty = true;
-      }),
-    );
-
-    new Setting(containerEl)
-      .setName(t(locale, "clozeScopeName"))
-      .setDesc(t(locale, "clozeScopeDesc"))
-      .addDropdown((d) =>
-        d
-          .addOption("anywhere", t(locale, "clozeScopeAnywhere"))
-          .addOption("callout-only", t(locale, "clozeScopeCalloutOnly"))
-          .setValue(this.plugin.settings.cloze.scope)
-          .onChange((v) => {
-            this.plugin.settings.cloze.scope = v as ClozeScope;
-            this.dirty = true;
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName(t(locale, "reminderName"))
-      .setDesc(t(locale, "reminderDesc"))
-      .addText((txt) =>
-        txt.setValue(String(this.plugin.settings.reminderIntervalDays)).onChange((v) => {
-          const n = parseInt(v, 10);
-          this.plugin.settings.reminderIntervalDays = Number.isFinite(n) && n >= 0 ? n : 0;
-          this.dirty = true;
-        }),
-      );
-
-    new Setting(containerEl).setName(t(locale, "dangerZone")).setHeading();
-    new Setting(containerEl)
-      .setName(t(locale, "resetName"))
-      .setDesc(t(locale, "resetDesc"))
-      .addButton((btn) =>
-        btn
-          .setButtonText(t(locale, "resetEverything"))
-          // See the ConfirmResetModal button above for why this stays
-          // setWarning() rather than the 1.13.0-only setDestructive().
-          .setWarning()
-          .onClick(() => {
-            new ConfirmResetModal(this.app, locale, async () => {
-              await this.plugin.resetAllProgress();
-              new Notice(t(locale, "noticeProgressReset"));
-            }).open();
-          }),
-      );
+  setControlValue(key: string, value: unknown): void {
+    this.dirty = true;
+    switch (key) {
+      case "deckTagRoot":
+        this.plugin.settings.deckTagRoot = String(value).trim();
+        break;
+      case "reverseEmoji":
+        this.plugin.settings.reverseEmoji = String(value).trim();
+        break;
+      case "calloutType":
+        this.plugin.settings.calloutType = String(value).trim();
+        break;
+      case "clozeHighlight":
+        this.plugin.settings.cloze.highlight = Boolean(value);
+        break;
+      case "clozeBold":
+        this.plugin.settings.cloze.bold = Boolean(value);
+        break;
+      case "clozeScope":
+        this.plugin.settings.cloze.scope = value as ClozeScope;
+        break;
+      case "reminderIntervalDays": {
+        const n = Number(value);
+        this.plugin.settings.reminderIntervalDays = Number.isFinite(n) && n >= 0 ? n : 0;
+        break;
+      }
+    }
   }
 
   /** Fires when the user navigates away from this settings tab. Persist +
    *  reindex exactly once here rather than per keystroke/click — see
    *  IngrainPlugin.saveSettings(). No-op if nothing actually changed. */
   hide(): void {
-    if (this.dirty) void this.plugin.saveSettings();
+    if (this.dirty) {
+      this.dirty = false;
+      void this.plugin.saveSettings();
+    }
   }
 }

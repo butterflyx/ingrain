@@ -2,7 +2,7 @@
   "id": "ingrain",
   "name": "Ingrain",
   "version": "0.1.0",
-  "minAppVersion": "1.8.7",
+  "minAppVersion": "1.13.0",
   "description": "Native callouts and highlights become flashcards — your files never know. Spaced repetition without plugin syntax.",
   "author": "butterflyx",
   "authorUrl": "https://github.com/butterflyx",
