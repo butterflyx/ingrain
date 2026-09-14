@@ -53,7 +53,7 @@ Ingrain isn't in the Community Plugins directory yet, so for now you build
 it from source:
 
 ```bash
-git clone <this-repo>
+git clone https://github.com/butterflyx/ingrain.git
 cd ingrain
 npm install
 npm run build
